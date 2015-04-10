@@ -1,5 +1,11 @@
+Examples
 
-python ibtrader.py --new_order --order_symbol EUR --order_secType CASH --order_exchange IDEALPRO --order_action BUY --order_type LMT --order_quantity 400000 --order_currency USD  --order_limit_price 2 --tcp_port 4001  ; sleep 5; python ibtrader.py --print_positions --close_sym_position --order_symbol EUR --tcp_port 4001; sleep 5; python ibtrader.py --print_positions
+python ibtrader.py --new_order --order_symbol EUR --order_secType CASH --order_exchange IDEALPRO --order_action BUY --order_type LMT --order_quantity 400000 --order_currency USD  --order_limit_price 2 --tcp_port 4001  
+sleep 5
+python ibtrader.py --print_positions --close_sym_position --order_symbol EUR --tcp_port 4001
+sleep 5
+python ibtrader.py --print_positions
+
 
 BUY 400K EUR @2 LMT
 Sleep 5 seconds
@@ -7,3 +13,5 @@ Print Positions
 Close Position for EUR
 Sleep 5
 Print Positions
+
+
