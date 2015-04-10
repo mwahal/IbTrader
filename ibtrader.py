@@ -235,14 +235,14 @@ def get_executions():
 
 	return execlist
 
-class PlaceOrderExample(EWrapper):
+class IBClient(EWrapper):
     '''Callback object passed to TWS, these functions will be called directly
     by TWS.
 
     '''
 
     def __init__(self):
-        super(PlaceOrderExample, self).__init__()
+        super(IBClient, self).__init__()
         self.order_filled = Event()
         self.order_ids = Queue()
 
@@ -539,7 +539,7 @@ order_structure = {}
 MEANINGLESS_NUMBER=1729
 
 # Instantiate our callback object
-callback = PlaceOrderExample()
+callback = IBClient()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-wt', '--wait_time', default='not_a_wait_time', help="Wait time in seconds for completion")
