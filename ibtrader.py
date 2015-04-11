@@ -347,9 +347,11 @@ class IBClient(EWrapper):
         global request_finished
         global is_request_open_order
         
-        '''Not relevant for our example'''
+        if debug:
+            print "openOrderEnd is_request_open_order = %d" % is_request_open_order
         if is_request_open_order:
             request_finished=True
+            is_request_open_order=False
         if debug:
            print "openOrderEnd"
         pass
@@ -543,8 +545,17 @@ callback = IBClient()
 
 parser = argparse.ArgumentParser()
 parser.add_argument('-wt', '--wait_time', default='not_a_wait_time', help="Wait time in seconds for completion")
+parser.add_argument('-gw', '--gateway', action='store_true', help="Use gateway tcp port 4001 by default")
+parser.add_argument('-tws', '--tws', action='store_true', help="Use TWS tcp port 7496 by default")
 parser.add_argument('-new', '--new_order', action='store_true', help="Place a new order")
-parser.add_argument('-os', '--order_symbol', default='not_a_symbol', help="Order Symbol")
+parser.add_argument('-ts', '--trade_stock', action='store_true', help="Place a stock order [STK,SMART,USD]")
+parser.add_argument('-tf', '--trade_forex', action='store_true', help="Place a forex order [CASH,IDEALPRO,USD]")
+parser.add_argument('-to', '--trade_options', action='store_true', help="Place an options order [OPT,SMART,USD]")
+parser.add_argument('-ll', '--long_lmt', action='store_true', help="Place a Long Limit order")
+parser.add_argument('-lm', '--long_mkt', action='store_true', help="Place a Long Market order")
+parser.add_argument('-sl', '--short_lmt', action='store_true', help="Place a Short Limit order")
+parser.add_argument('-sm', '--short_mkt', action='store_true', help="Place a Short Market order")
+parser.add_argument('-sym', '--symbol', default='not_a_symbol', help="Symbol")
 parser.add_argument('-ot', '--order_secType', default='not_a_secType', help="Security Type [CASH|STK|FUT|OPT|etc]")
 parser.add_argument('-oe', '--order_exchange', default='not_a_exchange', help="Exchange [IDEALPRO|SMART]")
 parser.add_argument('-oc', '--order_currency', default='not_a_currency', help="Currency USD")
@@ -554,17 +565,17 @@ parser.add_argument('-oo', '--order_type', default='not_a_type', help="Order Typ
 parser.add_argument('-oq', '--order_quantity', default='not_a_quantity', help="Order Quantity")
 parser.add_argument('-pf', '--print_portfolio', action='store_true', help="Print Portfolio")
 parser.add_argument('-pp', '--print_positions', action='store_true', help="Print ALL Positions")
-parser.add_argument('-ps', '--print_sym_position', action='store_true', help="Print Position for order_symbol")
+parser.add_argument('-ps', '--print_sym_position', action='store_true', help="Print Position for Symbol")
 parser.add_argument('-pe', '--print_executions', action='store_true', help="Print Executions")
-parser.add_argument('-pse', '--print_sym_executions', action='store_true', help="Print Executions for order_symbol")
+parser.add_argument('-pse', '--print_sym_executions', action='store_true', help="Print Executions for Symbol")
 parser.add_argument('-po', '--print_open_orders', action='store_true', help="Print Open Orders")
 parser.add_argument('-d', '--debug', action='store_true', help="Debug enable")
 parser.add_argument('-nod', '--no-debug', action='store_false', help="Debug disable")
 parser.add_argument('-tcp', '--tcp_port', default='not_a_tcp_port', help="Tcp port to use, default is 4001")
 parser.add_argument('-cal', '--cancel_all_orders', action='store_true', help="Cancel ALL open orders")
-parser.add_argument('-cso', '--cancel_sym_order', action='store_true', help="Cancel open orders for order_symbol")
+parser.add_argument('-cso', '--cancel_sym_order', action='store_true', help="Cancel open orders for Symbol")
 parser.add_argument('-clo', '--close_all_positions', action='store_true', help="Close ALL positions")
-parser.add_argument('-cls', '--close_sym_position', action='store_true', help="Close positions for order_symbol")
+parser.add_argument('-cls', '--close_sym_position', action='store_true', help="Close positions for Symbol")
 parser.add_argument('-nw', '--no_wait_for_complete', action='store_true', help="Dont wait for completion, just exit after placing order")
 
 
@@ -572,10 +583,15 @@ args = parser.parse_args()
 if args.debug:
     debug = 1
 if debug:
+    print "gateway ", args.gateway
+    print "tws ", args.tws
     print "new_order ", args.new_order
     print "wait_time ", args.wait_time
     print "tcp_port ", args.tcp_port
-    print "order_symbol ", args.order_symbol
+    print "symbol ", args.symbol
+    print "trade_stock ", args.trade_stock
+    print "trade_forex ", args.trade_forex
+    print "trade_options ", args.trade_options
     print "order_secType ", args.order_secType
     print "order_exchange ", args.order_exchange
     print "order_currency ", args.order_currency
@@ -593,21 +609,31 @@ if debug:
     print "close_sym_position ", args.close_sym_position
     print "cancel_sym_order ", args.cancel_sym_order
     print "no_wait_for_complete ", args.no_wait_for_complete
+    print "long_lmt ", args.long_lmt
+    print "long_mkt ", args.long_mkt
+    print "short_lmt ", args.short_lmt
+    print "short_mkt ", args.short_mkt
     print "debug ", args.debug
+
+if args.gateway:
+    args.tcp_port = 4001
+
+if args.tws:
+    args.tcp_port = 7496
 
 if args.tcp_port != 'not_a_tcp_port':
     tcp_port = int(args.tcp_port)
 
 
-if args.cancel_sym_order and args.order_symbol == 'not_a_symbol':
+if args.cancel_sym_order and args.symbol == 'not_a_symbol':
     print "No symbol provided to cancel an order"
     sys.exit()
 
-if args.close_sym_position and args.order_symbol == 'not_a_symbol':
+if args.close_sym_position and args.symbol == 'not_a_symbol':
     print "No symbol provided to close a position"
     sys.exit()
 
-if args.print_sym_position and args.order_symbol == 'not_a_symbol':
+if args.print_sym_position and args.symbol == 'not_a_symbol':
     print "No symbol provided to print a position"
     sys.exit()
 
@@ -619,8 +645,48 @@ tws = EPosixClientSocket(callback)
 if not tws.eConnect("", tcp_port, 42):
     raise RuntimeError('Failed to connect to TWS')
 
-if args.new_order:
-    order_symbol = args.order_symbol
+if args.new_order or args.trade_stock or args.trade_forex or args.trade_options:
+
+    if args.symbol == 'not_a_symbol':
+        print "No symbol passed in order"
+        sys.exit()
+
+    if args.trade_stock:
+        args.order_secType = "STK"
+        if order_exchange == 'not_a_exchange':
+            args.order_exchange = "SMART"
+        args.order_currency = "USD"
+
+    if args.trade_forex:
+        args.order_secType = "CASH"
+        if args.order_exchange == 'not_a_exchange':
+            args.order_exchange = "IDEALPRO"
+        if args.order_currency == 'not_a_currency':
+            args.order_currency = "USD"
+
+    if args.trade_options:
+        args.order_secType = "OPT"
+        if order_exchange == 'not_a_exchange':
+            args.order_exchange = "SMART"
+        args.order_currency = "USD"
+
+    if args.long_lmt:
+        args.order_action = "BUY"
+        args.order_type = "LMT"
+
+    if args.long_mkt:
+        args.order_action = "BUY"
+        args.order_type = "MKT"
+
+    if args.short_lmt:
+        args.order_action = "SELL"
+        args.order_type = "LMT"
+
+    if args.short_mkt:
+        args.order_action = "SELL"
+        args.order_type = "MKT"
+
+    order_symbol = args.symbol
     order_secType = args.order_secType
     order_exchange = args.order_exchange
     order_currency = args.order_currency
@@ -628,11 +694,6 @@ if args.new_order:
     order_limit_price = args.order_limit_price
     order_type = args.order_type
     order_quantity = int(args.order_quantity)
-
-
-    if order_symbol == 'not_a_symbol':
-        print "No symbol passed in order"
-        sys.exit()
 
     if order_secType == 'not_a_secType':
         print "No secType passed in order"
@@ -675,7 +736,7 @@ if args.print_executions or args.print_sym_executions:
    myexecutions = get_executions()
    for key in myexecutions:
        sym = key["symbol"]
-       if args.print_executions or (args.print_sym_executions and sym == args.order_symbol):
+       if args.print_executions or (args.print_sym_executions and sym == args.symbol):
            print sym,  key
 
 if args.print_portfolio or args.print_positions or args.print_sym_position:
@@ -700,7 +761,7 @@ if args.print_portfolio or args.print_positions or args.print_sym_position:
     for key, val in  port_holdings.items():
         sym = val["symbol"]
         qty = val["quantity"]
-        if qty != 0 and (args.print_positions or (args.print_sym_position and sym == args.order_symbol)):
+        if qty != 0 and (args.print_positions or (args.print_sym_position and sym == args.symbol)):
             marketValue = val["marketValue"]
             marketPrice = val["marketPrice"]
             averageCost = val["averageCost"]
@@ -723,7 +784,7 @@ if args.close_all_positions or args.close_sym_position:
         order_quantity = val["quantity"]
         if order_quantity < 0:
             order_quantity = -order_quantity
-        if order_quantity > 0 and (args.close_all_positions or (args.close_sym_position and args.order_symbol == order_symbol)):
+        if order_quantity > 0 and (args.close_all_positions or (args.close_sym_position and args.symbol == order_symbol)):
             if debug:
                 print "Portfolio %s %s", key, val
             order_secType = val["secType"]
@@ -745,7 +806,7 @@ if args.print_open_orders or args.cancel_all_orders or args.cancel_sym_order:
     for key, val in openorders.items():
         print key, val
         sym = val["symbol"]
-        if args.cancel_all_orders or (args.cancel_sym_order and args.order_symbol == sym):
+        if args.cancel_all_orders or (args.cancel_sym_order and args.symbol == sym):
             if debug:
                 print "Cancel order id %d symbol = %s" %  (key, sym)
             tws.cancelOrder(key)
