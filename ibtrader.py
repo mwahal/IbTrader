@@ -121,7 +121,7 @@ def get_IB_positions():
 
        
 
-def place_order(symbol, secType, exchange, currency, action, lmtPrice, orderType, totalQuantity):
+def place_order(symbol, secType, exchange, currency, action, lmtPrice, orderType, totalQuantity, user_account):
 
     global debug
     global order
@@ -161,7 +161,7 @@ def place_order(symbol, secType, exchange, currency, action, lmtPrice, orderType
     )
 
     if args.no_wait_for_complete:
-        print "OrderId %d place, not waiting to be filled" % order_id
+        print "PlacedOrder %d Symbol %s Qty %d Limit %d Action %s Type %s  Account %s SecType %s Exchange %s Currency %s" % (order_id, symbol, order.totalQuantity,  lmtPrice, action, orderType, user_account, secType, exchange, currency)
         if debug:
             print "Not waiting for order to be completed"
         return
@@ -388,7 +388,7 @@ class IBClient(EWrapper):
         expiry=contract.expiry
         side=execution.side
 
-        execdetails=dict(side=str(side), times=str(exectime), orderid=str(thisorderid), qty=int(cumQty), price=float(avgprice), symbol=str(symbol), expiry=str(expiry), clientid=str(clientid), execid=str(execid), account=str(account_number), exchange=str(exchange), permid=int(permid))
+        execdetails=dict(side=str(side), times=str(exectime), orderid=str(thisorderid), execshares=int(execution.shares), qty=int(cumQty), avgprice=float(execution.avgPrice), execprice=float(execution.price), symbol=str(symbol), expiry=str(expiry), clientid=str(clientid), execid=str(execid), account=str(account_number), exchange=str(exchange), permid=int(permid))
 
         if debug:
 #           print "execDetails id = %s contract = %s execution = %s" % (id, str(contract), str(execution))
@@ -537,6 +537,8 @@ total_comm = 0
 debug = 0
 #tcp_port = 7496
 tcp_port = 4001
+tws_host = ""
+tws_clientid = 8899
 WAIT_TIME = 300
 MAX_WAIT_SECONDS = 30
 order_structure = {}
@@ -574,11 +576,14 @@ parser.add_argument('-po', '--print_open_orders', action='store_true', help="Pri
 parser.add_argument('-d', '--debug', action='store_true', help="Debug enable")
 parser.add_argument('-nod', '--no-debug', action='store_false', help="Debug disable")
 parser.add_argument('-tcp', '--tcp_port', default='not_a_tcp_port', help="Tcp port to use, default is 4001")
+parser.add_argument('-clid', '--tws_clientid', default='not_a_tws_clientid', help="TWS Client ID, default is 8899")
+parser.add_argument('-host', '--tws_host', default='not_a_tws_host', help="host name/address to use, default is localhost")
 parser.add_argument('-cal', '--cancel_all_orders', action='store_true', help="Cancel ALL open orders")
 parser.add_argument('-cso', '--cancel_sym_order', action='store_true', help="Cancel open orders for Symbol")
 parser.add_argument('-clo', '--close_all_positions', action='store_true', help="Close ALL positions")
 parser.add_argument('-cls', '--close_sym_position', action='store_true', help="Close positions for Symbol")
 parser.add_argument('-nw', '--no_wait_for_complete', action='store_true', help="Dont wait for completion, just exit after placing order")
+parser.add_argument('-acnum', '--account_number', default='not_a_account_number', help="Account Number")
 
 
 args = parser.parse_args()
@@ -590,6 +595,8 @@ if debug:
     print "new_order ", args.new_order
     print "wait_time ", args.wait_time
     print "tcp_port ", args.tcp_port
+    print "tws_host ", args.tws_host
+    print "tws_clientid ", args.tws_clientid
     print "symbol ", args.symbol
     print "trade_stock ", args.trade_stock
     print "trade_forex ", args.trade_forex
@@ -615,6 +622,7 @@ if debug:
     print "long_mkt ", args.long_mkt
     print "short_lmt ", args.short_lmt
     print "short_mkt ", args.short_mkt
+    print "account_number ", args.account_number
     print "debug ", args.debug
 
 if args.gateway:
@@ -626,6 +634,8 @@ if args.tws:
 if args.tcp_port != 'not_a_tcp_port':
     tcp_port = int(args.tcp_port)
 
+if args.tws_host != 'not_a_tws_host':
+    tws_host = args.tws_host
 
 if args.cancel_sym_order and args.symbol == 'not_a_symbol':
     print "No symbol provided to cancel an order"
@@ -643,8 +653,11 @@ if args.print_sym_position and args.symbol == 'not_a_symbol':
 # callback object so TWS can respond.
 tws = EPosixClientSocket(callback)
 
+if args.tws_clientid == 'not_a_tws_clientid':
+   args.tws_clientid = tws_clientid
+
 # Connect to tws running on localhost
-if not tws.eConnect("", tcp_port, 42):
+if not tws.eConnect(tws_host, tcp_port, args.tws_clientid):
     raise RuntimeError('Failed to connect to TWS')
 
 if args.new_order or args.trade_stock or args.trade_forex or args.trade_options:
@@ -731,8 +744,7 @@ if args.new_order or args.trade_stock or args.trade_forex or args.trade_options:
     else:
        order_limit_price = float(args.order_limit_price)
 
-    place_order(order_symbol, order_secType, order_exchange, order_currency, order_action, order_limit_price, order_type, order_quantity)
-    #place_order("EUR", "CASH", "IDEALPRO", "USD", "BUY", 0, "MKT", 4000000)
+    place_order(order_symbol, order_secType, order_exchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number)
 
 if args.print_executions or args.print_sym_executions:
    myexecutions = get_executions()
@@ -761,9 +773,12 @@ if args.print_portfolio or args.print_positions or args.print_sym_position:
     if debug:
         print "Portfolio Holdings"
     for key, val in  port_holdings.items():
+        if debug:
+           print "Port_Holdings %s = %s" % (key, val)
         sym = val["symbol"]
         qty = val["quantity"]
         if qty != 0 and (args.print_positions or (args.print_sym_position and sym == args.symbol)):
+            this_symbol = val["this_symbol"]
             marketValue = val["marketValue"]
             marketPrice = val["marketPrice"]
             averageCost = val["averageCost"]
@@ -775,12 +790,13 @@ if args.print_portfolio or args.print_positions or args.print_sym_position:
                 hold_type = "LONG"
             else:
                 hold_type = "SHORT"
-            print sym, hold_type, qty, marketValue, costPrice, gnloss, marketPrice, averageCost, secType, accountName
+            print this_symbol, sym, hold_type, qty, marketValue, costPrice, gnloss, marketPrice, averageCost, secType, accountName
 
 
 if args.close_all_positions or args.close_sym_position:
     myport = get_IB_positions()
     all_positions = myport[2]
+    args.no_wait_for_complete = 1
     for key, val in  all_positions.items():
         order_symbol = val["this_symbol"]
         order_quantity = val["quantity"]
@@ -794,12 +810,12 @@ if args.close_all_positions or args.close_sym_position:
             order_currency = val["currency"]
             order_action = val["flip_action"]
             order_type = "MKT"
-            print "Close order_symbol = %s %s %s %d @ %s order_exchange = %s" % (order_symbol, key, order_action, order_quantity, order_type, order_exchange)
+            if debug:
+               print "Close order_symbol = %s %s %s %d @ %s order_exchange = %s" % (order_symbol, key, order_action, order_quantity, order_type, order_exchange)
             order_limit_price = 0
             if order_exchange == '':
                order_exchange = get_order_exchange(order_symbol, order_secType, order_currency)
-            #print      (order_symbol, order_secType, order_exchange, order_currency, order_action, order_limit_price, order_type, order_quantity)
-            place_order(order_symbol, order_secType, order_exchange, order_currency, order_action, order_limit_price, order_type, order_quantity)
+            place_order(order_symbol, order_secType, order_exchange, order_currency, order_action, order_limit_price, order_type, order_quantity, account_number)
 
 if args.print_open_orders or args.cancel_all_orders or args.cancel_sym_order:
     openorders = get_open_orders()

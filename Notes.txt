@@ -1,0 +1,134 @@
+
+
+Each account - 
+	a unique clientid to connect to TWS
+	a unique instance of GW running with a unique TCP port
+	a unique account number to be passed
+
+
+Function: IS_OK_TO_PLACE_ORDER(symbol, trade_only_if_position, wait_for_open_order_to_finish)
+		POSITION = Get_Position(symbol)
+		if (trade_only_if_position == TRUE)
+			if POSITION.qty == 0 then
+				return FALSE
+			endif
+		endif
+
+		ENTRY_OPEN_ORDER = (OUTSTANDING_ORDERS.symbol == symbol)
+		if (ENTRY_OPEN_ORDER.open_order == TRUE) then
+			if wait_for_open_order_to_finish == TRUE then
+				return FALSE
+			endif
+			do
+				ENTRY_OPEN_ORDER = (OUTSTANDING_ORDERS.symbol == symbol)
+				if ENTRY_OPEN_ORDER.open_order == TRUE then
+					break_loop
+				endif
+			while TRUE
+		endif
+
+				
+				
+
+		
+Flow:
+		
+	if IS_OK_TO_PLACE_ORDER(symbol, TRUE, TRUE) returns FALSE then
+		return FALSE
+	endif
+		
+	place asynchronous order
+		place order
+				PlacedOrder 9 Symbol EUR Qty 25000 Limit 0 
+				              Action BUY Type MKT  Account DU226708 
+							  SecType CASH Exchange IDEALPRO Currency USD
+		if failed then
+			Update_Error_Table(FAILURE_CODE)
+			return FALSE
+		endif
+		verify symbol , qty, action, type 
+		Note the order id
+		Store it in the database with timestamp
+			Table - ORDERS_PLACED
+			   ENTRY = new Row()
+			   ENTRY.order_open_time = time()
+			   ENTRY.orderid = orderid
+			   ENTRY.symbol = symbol
+			   ENTRY.sectype = sectype
+			   ENTRY.currency = currency
+			   ENTRY.exchange = exchange
+			   ENTRY.qty_requested = qty_requested
+			   ENTRY.limit_price = limit_price
+			   ENTRY.order_action = order_action
+			   ENTRY.order_type = order_type
+			   ENTRY.account_number = account_number
+			   ENTRY.order_completed = FALSE
+							
+
+			Table - OUTSTANDING_ORDERS
+				ENTRY.symbol = symbol
+				ENTRY.order_open = TRUE
+				ENTRY.order_open_time = time()
+
+
+Function Fill_Execution:
+
+	Connect to TWS
+	Fill Get_All_Executions[]
+	if failed then
+		Update_Error_Table(FAILURE_CODE)
+		return FALSE
+	endif
+	for ENTRY in the table ORDERS_PLACED
+		if ENTRY.order_completed is FALSE
+			orderid = ENTRY.orderid
+			qty_requested = ENTRY.qty_requested
+			qty_filled = Get_All_Executions[orderid].qty_filled
+			if (qty_requested == qty_filled) then
+				ENTRY.order_completed = TRUE
+				ENTRY.qty_filled = qty_filled
+				ENTRY.order_filled_time = Get_All_Executions[orderid].fill_time[LAST]
+				ORDER_OPEN_ENTRY = (OUTSTANDING_ORDERS.symbol == ENTRY.symbol)
+				ORDER_OPEN_ENTRY.order_open = FALSE
+				ORDER_OPEN_ENTRY.time_filled = ENTRY.order_filled_time
+				Update_Local_Portfolio(ENTRY)
+			endif
+		endif
+	endfor
+	
+	
+
+Function Update_Local_Portfolio(ENTRY_ORDERS_PLACED)
+	Index = ENTRY_ORDERS_PLACED.symbol && ENTRY_ORDERS_PLACED.secType && ENTRY_ORDERS_PLACED.currency
+	ENTRY_LOCAL_PORTFOLIO = TABLE_LOCAL_PORTFOLIO(Index)
+	If ENTRY_LOCAL_PORTFOLIO is EMPTY then
+		Create a new row in TABLE_LOCAL_PORTFOLIO
+		Insert(ENTRY_ORDERS_PLACED)
+		return
+	endif
+	if ENTRY_LOCAL_PORTFOLIO.order_action != ENTRY_ORDERS_PLACED.order_execution
+		Adjust_Qty_Filled(ENTRY_LOCAL_PORTFOLIO, ENTRY_ORDERS_PLACED)
+		if ENTRY_LOCAL_PORTFOLIO.qty_filled == 0 then
+			delete ENTRY_LOCAL_PORTFOLIO
+		endif
+	endif
+
+Function Fill_IB_Portfolio
+	Connect to TWS
+	if failed then
+		Update_Error_Table(FAILURE_CODE)
+		return FALSE
+	endif
+	Portfolio[] = Get_All_Portfolio()
+	for all entries in Portfolio
+
+		TABLE_NAME = IB_PORTFOLIO
+		ENTRY_IB_PORTFOLIO = INSERT_REPLACE_IN_TABLE(symbol, complete_symbol_type, holding_type, quantity, marketValue, costPrice, gnloss, marketPrice, averageCost, secType, accountName)
+		Index = TABLE_LOCAL_PORTFOLIO.symbol && TABLE_LOCAL_PORTFOLIO.secType && TABLE_LOCAL_PORTFOLIO.currency
+		ENTRY_LOCAL_PORTFOLIO = TABLE_LOCAL_PORTFOLIO(Index)
+		Compare_Portfolio_IB_and_Local(ENTRY_IB_PORTFOLIO, ENTRY_LOCAL_PORTFOLIO)
+	endfor
+
+Background:
+	Fill_Execution
+	Fill_IB_Portfolio
