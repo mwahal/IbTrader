@@ -655,7 +655,7 @@ if args.new_order or args.trade_stock or args.trade_forex or args.trade_options:
 
     if args.trade_stock:
         args.order_secType = "STK"
-        if order_exchange == 'not_a_exchange':
+        if args.order_exchange == 'not_a_exchange':
             args.order_exchange = "SMART"
         args.order_currency = "USD"
 
