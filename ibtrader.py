@@ -25,7 +25,7 @@ except:
 
 def get_order_exchange(symbol, secType, currency):
     
-    FOREX_SYMS=['EUR', 'JPY', 'GBP', 'AUD', 'USD']
+    FOREX_SYMS=['EUR', 'JPY', 'GBP', 'AUD', 'USD', 'EUR.USD', 'JPY.USD', 'GBP.USD', 'AUD.USD', 'USD.JPY']
     if symbol in FOREX_SYMS and secType == "CASH":
         return "IDEALPRO"
     return "SMART"
@@ -132,6 +132,8 @@ def place_order(symbol, secType, exchange, currency, action, lmtPrice, orderType
     contract.secType = secType
     contract.exchange = exchange
     contract.currency = currency
+    if debug:
+       print("place_order : Contract.symbol = %s secType = %s exchange = %s currency = %s" % (symbol, secType, exchange, currency))
 
     if debug:
        print('Waiting for valid order id')
@@ -260,8 +262,8 @@ class IBClient(EWrapper):
 
                 
         if debug:
-           print "updatePortfolio  symbol = %s expiry = %s position = %s marketPrice = %s marketValue = %s averageCost = %s unrealizedPNL = %s realizedPNL = %s accountName = %s contract.currency = %s" % (contract.symbol, contract.expiry, position, marketPrice, marketValue, averageCost, unrealizedPNL, realizedPNL, accountName, contract.currency)
-        sym = contract.symbol
+           print "updatePortfolio  symbol = %s expiry = %s position = %s marketPrice = %s marketValue = %s averageCost = %s unrealizedPNL = %s realizedPNL = %s accountName = %s contract.currency = %s contract.localSymbol = %s contract.conId = %s contract.right = %s contract.strike = %s contract.tradingClass = %s" % (contract.symbol, contract.expiry, position, marketPrice, marketValue, averageCost, unrealizedPNL, realizedPNL, accountName, contract.currency, contract.localSymbol, contract.conId, contract.right, contract.strike, contract.tradingClass)
+        sym = contract.localSymbol.replace(' ', '')
         if position > 0:
             curr_action = "BUY"
             flip_action = "SELL"
@@ -269,7 +271,7 @@ class IBClient(EWrapper):
             curr_action = "SELL"
             flip_action = "BUY"
 
-        portdict=dict(contract=contract, symbol=contract.symbol , expiry=contract.expiry, 
+        portdict=dict(contract=contract, symbol=sym , this_symbol=contract.symbol, expiry=contract.expiry, 
                        secType=contract.secType, currency=contract.currency,
                        exchange=contract.exchange,quantity=position,
                        marketPrice=marketPrice, marketValue= marketValue, averageCost=averageCost,
@@ -278,7 +280,7 @@ class IBClient(EWrapper):
 
         portfolio_holdings[sym] = portdict
         #portfolio_holdings[sym] = (contract.symbol, contract.expiry, position, marketPrice, marketValue, averageCost, unrealizedPNL, realizedPNL, accountName, contract.currency)
-        portfolio_structure.append((contract.symbol, contract.expiry, position, marketPrice, marketValue, averageCost, 
+        portfolio_structure.append((sym, contract.expiry, position, marketPrice, marketValue, averageCost, 
                                     unrealizedPNL, realizedPNL, accountName, contract.currency))
 
     def error(self, id, errorCode, errorString):
@@ -746,7 +748,7 @@ if args.print_portfolio or args.print_positions or args.print_sym_position:
     exch_rates = myport[1]
     port_holdings = myport[2]
     total_cb = myport[3]
-    print "AccountName %s" % account_number
+    #print "AccountName %s" % account_number
     if args.print_portfolio:
         print "\nPositions"
         print port_struct
@@ -780,7 +782,7 @@ if args.close_all_positions or args.close_sym_position:
     myport = get_IB_positions()
     all_positions = myport[2]
     for key, val in  all_positions.items():
-        order_symbol = val["symbol"]
+        order_symbol = val["this_symbol"]
         order_quantity = val["quantity"]
         if order_quantity < 0:
             order_quantity = -order_quantity
@@ -792,7 +794,7 @@ if args.close_all_positions or args.close_sym_position:
             order_currency = val["currency"]
             order_action = val["flip_action"]
             order_type = "MKT"
-            print "Close %s %s %d @ %s" % (key, order_action, order_quantity, order_type)
+            print "Close order_symbol = %s %s %s %d @ %s order_exchange = %s" % (order_symbol, key, order_action, order_quantity, order_type, order_exchange)
             order_limit_price = 0
             if order_exchange == '':
                order_exchange = get_order_exchange(order_symbol, order_secType, order_currency)
