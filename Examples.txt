@@ -17,3 +17,5 @@ Print Positions
 
 
 python ibtrader.py -tcp 4002 -host 192.168.123.4 -pp
+
+python ibtrader.py -tcp 4002 -host 192.168.123.4 --trade_forex --long_mkt -sym EUR -oq 2500000 -nw -acnum DU226708
