@@ -566,11 +566,13 @@ parser.add_argument('-oc', '--order_currency', default='not_a_currency', help="C
 parser.add_argument('-oa', '--order_action', default='not_a_action', help="Order action BUY|SELL")
 parser.add_argument('-ol', '--order_limit_price', default='not_a_limit_price', help="Limit Price for the order, ignored in case of market order")
 parser.add_argument('-oo', '--order_type', default='not_a_type', help="Order Type LMT|MKT -- can be more")
+parser.add_argument('-oid', '--order_id', default='not_a_order_id', help="Order ID - used to search execution")
 parser.add_argument('-oq', '--order_quantity', default='not_a_quantity', help="Order Quantity")
 parser.add_argument('-pf', '--print_portfolio', action='store_true', help="Print Portfolio")
 parser.add_argument('-pp', '--print_positions', action='store_true', help="Print ALL Positions")
 parser.add_argument('-ps', '--print_sym_position', action='store_true', help="Print Position for Symbol")
 parser.add_argument('-pe', '--print_executions', action='store_true', help="Print Executions")
+parser.add_argument('-pid', '--print_order_id', action='store_true', help="Print Executions By Order ID")
 parser.add_argument('-pse', '--print_sym_executions', action='store_true', help="Print Executions for Symbol")
 parser.add_argument('-po', '--print_open_orders', action='store_true', help="Print Open Orders")
 parser.add_argument('-d', '--debug', action='store_true', help="Debug enable")
@@ -612,6 +614,8 @@ if debug:
     print "print_positions ", args.print_positions
     print "print_sym_position ", args.print_sym_position
     print "print_executions ", args.print_executions
+    print "order_id ", args.order_id
+    print "print_order_id ", args.print_order_id
     print "print_sym_executions ", args.print_sym_executions
     print "print_open_orders ", args.print_open_orders
     print "close_all_positions ", args.close_all_positions
@@ -746,11 +750,16 @@ if args.new_order or args.trade_stock or args.trade_forex or args.trade_options:
 
     place_order(order_symbol, order_secType, order_exchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number)
 
-if args.print_executions or args.print_sym_executions:
+if args.print_executions or args.print_sym_executions or args.print_order_id:
+   if args.print_order_id && args.order_id == 'not_a_order_id':
+      print 'Order Id not provided'
+      sys.exit()
+
    myexecutions = get_executions()
    for key in myexecutions:
        sym = key["symbol"]
-       if args.print_executions or (args.print_sym_executions and sym == args.symbol):
+       oid = key["orderid"]
+       if args.print_executions or (args.print_sym_executions and sym == args.symbol) or (args.print_order_id && args.order_id == oid):
            print sym,  key
 
 if args.print_portfolio or args.print_positions or args.print_sym_position:
