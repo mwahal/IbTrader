@@ -751,7 +751,7 @@ if args.new_order or args.trade_stock or args.trade_forex or args.trade_options:
     place_order(order_symbol, order_secType, order_exchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number)
 
 if args.print_executions or args.print_sym_executions or args.print_order_id:
-   if args.print_order_id && args.order_id == 'not_a_order_id':
+   if args.print_order_id and args.order_id == 'not_a_order_id':
       print 'Order Id not provided'
       sys.exit()
 
@@ -759,7 +759,7 @@ if args.print_executions or args.print_sym_executions or args.print_order_id:
    for key in myexecutions:
        sym = key["symbol"]
        oid = key["orderid"]
-       if args.print_executions or (args.print_sym_executions and sym == args.symbol) or (args.print_order_id && args.order_id == oid):
+       if args.print_executions or (args.print_sym_executions and sym == args.symbol) or (args.print_order_id and args.order_id == oid):
            print sym,  key
 
 if args.print_portfolio or args.print_positions or args.print_sym_position:
