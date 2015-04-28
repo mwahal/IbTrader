@@ -1,18 +1,23 @@
 
 ACCOUNT_INFO
-	Account_Number VARCHAR(20)
+	Account_Number VARCHAR(20) (INDEX)
 	Account_Broker VARCHAR(20)
 	Account_Name   VARCHAR(20)
 	Account_Value DECIMAL(10,2)
+	GW_TCP_PORT_NUM INT
+	TWS_TCP_PORT_NUM INT
+	GW_TCP_IP_ADDR VARCHAR(20)
+	TWS_TCP_IP_ADDR VARCHAR(20)
 	TimeLastSynced DATETIME
 
 
 ORDERS_PLACED
 
    order_open_time DATETIME
+   order_filled_time DATETIME
    price_signal = DECIMAL(10,2)
 
-   orderid = INT
+   orderid = INT (INDEX)
    symbol = VARCHAR(10)
    sectype = VARCHAR(10)
    currency = VARCHAR(10)
@@ -29,6 +34,7 @@ ORDERS_PLACED
 
 OUTSTANDING_ORDERS
    symbol = VARCHAR(10)
+   orderid = INT (INDEX)
    is_order_open = BOOLEAN
    order_open_time = DATETIME
    order_filled_time = DATETIME
@@ -39,9 +45,8 @@ TABLE_LOCAL_PORTFOLIO
 
 
 IB_PORTFOLIO
-		ENTRY_IB_PORTFOLIO = INSERT_REPLACE_IN_TABLE(symbol, complete_symbol_type, holding_type, quantity, marketValue, costPrice, gnloss, marketPrice, averageCost, secType, accountName)
    symbol = VARCHAR(10)
-   complete_symbol_type = VARCHAR(10)
+   complete_symbol_type = VARCHAR(10) (INDEX)
    holding_type = VARCHAR(10)
    quantity  = INT
    marketValue = DECIMAL(10,2)
