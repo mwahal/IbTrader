@@ -1,0 +1,53 @@
+
+ACCOUNT_INFO
+	Account_Number VARCHAR(20)
+	Account_Broker VARCHAR(20)
+	Account_Name   VARCHAR(20)
+	Account_Value DECIMAL(10,2)
+	TimeLastSynced DATETIME
+
+
+ORDERS_PLACED
+
+   order_open_time DATETIME
+   price_signal = DECIMAL(10,2)
+
+   orderid = INT
+   symbol = VARCHAR(10)
+   sectype = VARCHAR(10)
+   currency = VARCHAR(10)
+   exchange = VARCHAR(10)
+   qty_requested = INT
+   qty_filled = INT
+   limit_price = DECIMAL(10,2)
+   order_action = VARCHAR(10)
+   order_type = VARCHAR(10)
+   account_number = VARCHAR(10)
+   holding_type = VARCHAR(10) (LONG/SHORT)
+   order_completed = BOOLEAN
+
+
+OUTSTANDING_ORDERS
+   symbol = VARCHAR(10)
+   is_order_open = BOOLEAN
+   order_open_time = DATETIME
+   order_filled_time = DATETIME
+			
+
+TABLE_LOCAL_PORTFOLIO
+	Same as ORDERS_PLACED
+
+
+IB_PORTFOLIO
+		ENTRY_IB_PORTFOLIO = INSERT_REPLACE_IN_TABLE(symbol, complete_symbol_type, holding_type, quantity, marketValue, costPrice, gnloss, marketPrice, averageCost, secType, accountName)
+   symbol = VARCHAR(10)
+   complete_symbol_type = VARCHAR(10)
+   holding_type = VARCHAR(10)
+   quantity  = INT
+   marketValue = DECIMAL(10,2)
+   costPrice = DECIMAL(10,2)
+   gnloss = DECIMAL(10,2)
+   marketPrice = DECIMAL(10,4)
+   averageCost = DECIMAL(10,4)
+   accountName = VARCHAR(10)
+
