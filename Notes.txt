@@ -31,7 +31,7 @@ Function: IS_OK_TO_PLACE_ORDER(symbol, trade_only_if_position, wait_for_open_ord
 				
 
 		
-Flow:
+Function PlaceOrder(symbol, price_signal, secType, currency, qty, action, order_type, limitprice, exchange, order_time)
 		
 	if IS_OK_TO_PLACE_ORDER(symbol, TRUE, TRUE) returns FALSE then
 		return FALSE
@@ -51,13 +51,17 @@ Flow:
 		Store it in the database with timestamp
 			Table - ORDERS_PLACED
 			   ENTRY = new Row()
-			   ENTRY.order_open_time = time()
+
+			   ENTRY.order_open_time = order_time
+			   ENTRY.price_signal = price_signal
+
 			   ENTRY.orderid = orderid
 			   ENTRY.symbol = symbol
 			   ENTRY.sectype = sectype
 			   ENTRY.currency = currency
 			   ENTRY.exchange = exchange
 			   ENTRY.qty_requested = qty_requested
+			   ENTRY.qty_filled = 0
 			   ENTRY.limit_price = limit_price
 			   ENTRY.order_action = order_action
 			   ENTRY.order_type = order_type
@@ -67,7 +71,7 @@ Flow:
 
 			Table - OUTSTANDING_ORDERS
 				ENTRY.symbol = symbol
-				ENTRY.order_open = TRUE
+				ENTRY.is_order_open = TRUE
 				ENTRY.order_open_time = time()
 
 
@@ -88,9 +92,10 @@ Function Fill_Execution:
 				ENTRY.order_completed = TRUE
 				ENTRY.qty_filled = qty_filled
 				ENTRY.order_filled_time = Get_All_Executions[orderid].fill_time[LAST]
+                                ENTRY.holding_type = order_action == BUY  ? LONG : SHORT
 				ORDER_OPEN_ENTRY = (OUTSTANDING_ORDERS.symbol == ENTRY.symbol)
-				ORDER_OPEN_ENTRY.order_open = FALSE
-				ORDER_OPEN_ENTRY.time_filled = ENTRY.order_filled_time
+				ORDER_OPEN_ENTRY.is_order_open = FALSE
+				ORDER_OPEN_ENTRY.order_filled_time = ENTRY.order_filled_time
 				Update_Local_Portfolio(ENTRY)
 			endif
 		endif
@@ -106,10 +111,10 @@ Function Update_Local_Portfolio(ENTRY_ORDERS_PLACED)
 		Insert(ENTRY_ORDERS_PLACED)
 		return
 	endif
-	if ENTRY_LOCAL_PORTFOLIO.order_action != ENTRY_ORDERS_PLACED.order_execution
+	if ENTRY_LOCAL_PORTFOLIO.order_action != ENTRY_ORDERS_PLACED.order_action
 		Adjust_Qty_Filled(ENTRY_LOCAL_PORTFOLIO, ENTRY_ORDERS_PLACED)
 		if ENTRY_LOCAL_PORTFOLIO.qty_filled == 0 then
-			delete ENTRY_LOCAL_PORTFOLIO
+                    delete ENTRY_LOCAL_PORTFOLIO
 		endif
 	endif
 
