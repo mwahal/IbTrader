@@ -70,9 +70,10 @@ Function PlaceOrder(symbol, price_signal, secType, currency, qty, action, order_
 							
 
 			Table - OUTSTANDING_ORDERS
-				ENTRY.symbol = symbol
-				ENTRY.is_order_open = TRUE
-				ENTRY.order_open_time = time()
+				ENTRY_OUTSTANDING_ORDERS.symbol = symbol
+				ENTRY_OUTSTANDING_ORDERS.is_order_open = TRUE
+				ENTRY_OUTSTANDING_ORDERS.order_open_time = time()
+			    ENTRY_OUTSTANDING_ORDERS.orderid = orderid
 
 
 Function Fill_Execution:
@@ -83,8 +84,9 @@ Function Fill_Execution:
 		Update_Error_Table(FAILURE_CODE)
 		return FALSE
 	endif
-	for ENTRY in the table ORDERS_PLACED
-		if ENTRY.order_completed is FALSE
+	for ENTRY_OUTSTANDING_ORDERS in the table OUTSTANDING_ORDERS
+		if ENTRY_OUTSTANDING_ORDERS.is_order_open is TRUE
+			ENTRY = (ORDERS_PLACED.orderid == ENTRY_OUTSTANDING_ORDERS.orderid)
 			orderid = ENTRY.orderid
 			qty_requested = ENTRY.qty_requested
 			qty_filled = Get_All_Executions[orderid].qty_filled
@@ -93,9 +95,10 @@ Function Fill_Execution:
 				ENTRY.qty_filled = qty_filled
 				ENTRY.order_filled_time = Get_All_Executions[orderid].fill_time[LAST]
                                 ENTRY.holding_type = order_action == BUY  ? LONG : SHORT
-				ORDER_OPEN_ENTRY = (OUTSTANDING_ORDERS.symbol == ENTRY.symbol)
-				ORDER_OPEN_ENTRY.is_order_open = FALSE
-				ORDER_OPEN_ENTRY.order_filled_time = ENTRY.order_filled_time
+				ENTRY_OUTSTANDING_ORDERS.is_order_open = FALSE
+				ENTRY_OUTSTANDING_ORDERS.order_filled_time = ENTRY.order_filled_time
+				SAVE(ENTRY_OUTSTANDING_ORDERS)
+				DELETE(ENTRY_OUTSTANDING_ORDERS)
 				Update_Local_Portfolio(ENTRY)
 			endif
 		endif
