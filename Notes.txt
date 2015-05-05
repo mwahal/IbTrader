@@ -73,7 +73,7 @@ Function PlaceOrder(symbol, price_signal, secType, currency, qty, action, order_
 				ENTRY_OUTSTANDING_ORDERS.symbol = symbol
 				ENTRY_OUTSTANDING_ORDERS.is_order_open = TRUE
 				ENTRY_OUTSTANDING_ORDERS.order_open_time = time()
-			    ENTRY_OUTSTANDING_ORDERS.orderid = orderid
+				ENTRY_OUTSTANDING_ORDERS.orderid = orderid
 
 
 Function Fill_All_Execution_Table:
