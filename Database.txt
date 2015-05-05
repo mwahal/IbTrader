@@ -1,5 +1,5 @@
 
-ACCOUNT_INFO
+DB_ACCOUNT_INFO
 	Account_Number VARCHAR(20) (INDEX)
 	Account_Broker VARCHAR(20)
 	Account_Name   VARCHAR(20)
@@ -11,11 +11,11 @@ ACCOUNT_INFO
 	TimeLastSynced DATETIME
 
 
-ORDERS_PLACED
+DB_ORDERS_PLACED
 
    order_open_time DATETIME
    order_filled_time DATETIME
-   price_signal = DECIMAL(10,2)
+   price_signal = DECIMAL(10,4)
 
    orderid = INT (INDEX)
    symbol = VARCHAR(10)
@@ -24,15 +24,16 @@ ORDERS_PLACED
    exchange = VARCHAR(10)
    qty_requested = INT
    qty_filled = INT
-   limit_price = DECIMAL(10,2)
+   limit_price = DECIMAL(10,4)
    order_action = VARCHAR(10)
    order_type = VARCHAR(10)
    account_number = VARCHAR(10)
    holding_type = VARCHAR(10) (LONG/SHORT)
    order_completed = BOOLEAN
+   avgprice = DECIMAL(10,4)
 
 
-OUTSTANDING_ORDERS
+DB_OUTSTANDING_ORDERS
    symbol = VARCHAR(10)
    orderid = INT (INDEX)
    is_order_open = BOOLEAN
@@ -40,13 +41,13 @@ OUTSTANDING_ORDERS
    order_filled_time = DATETIME
 			
 
-TABLE_LOCAL_PORTFOLIO
+DB_LOCAL_PORTFOLIO
 	Same as ORDERS_PLACED
 
 
-BROKER_PORTFOLIO
+DB_BROKER_PORTFOLIO
    symbol = VARCHAR(10)
-   complete_symbol_type = VARCHAR(10) (INDEX)
+   complete_symbol_type = VARCHAR(32) (INDEX)
    holding_type = VARCHAR(10)
    quantity  = INT
    marketValue = DECIMAL(10,2)
@@ -57,7 +58,7 @@ BROKER_PORTFOLIO
    accountName = VARCHAR(10)
 
 
-EXEC_REPORTS
+DB_BROKER_EXEC_REPORT
 
 #EUR {'orderid': '1', 'account': 'DU226708', 'execprice': 1.11865, 'exchange': 'IDEALPRO', 'symbol': 'EUR', 'permid': 2137440949, 'execid': '0001f4e8.55493475.01.01', 'clientid': '8899', 'qty': 1000000, 'avgprice': 1.11865, 'execshares': 1000000, 'expiry': '', 'side': 'SLD', 'times': '20150505  15:01:53'}
 	orderid = INT
@@ -73,4 +74,13 @@ EXEC_REPORTS
 	execshares = INT
 	expiry = VARCHAR(20)
 	side = VARCHAR(10)
-	exectime = DATETIME
+	exectime = DATETIME (INDEX)
+
+DB_GET_ALL_EXECUTIONS
+	orderid = INT (INDEX)
+	symbol = VARCHAR(10)
+	side = VARCHAR(10)
+	qty_filled = INT
+	numexec = INT
+	avgprice = DECIMAL(10,4)
+	last_exectime = DATETIME
