@@ -121,7 +121,7 @@ Function Update_Local_Portfolio(ENTRY_ORDERS_PLACED)
 		endif
 	endif
 
-Function Fill_IB_Portfolio
+Function Fill_Broker_Portfolio
 	Connect to TWS
 	if failed then
 		Update_Error_Table(FAILURE_CODE)
@@ -130,13 +130,13 @@ Function Fill_IB_Portfolio
 	Portfolio[] = Get_All_Portfolio()
 	for all entries in Portfolio
 
-		TABLE_NAME = IB_PORTFOLIO
-		ENTRY_IB_PORTFOLIO = INSERT_REPLACE_IN_TABLE(symbol, complete_symbol_type, holding_type, quantity, marketValue, costPrice, gnloss, marketPrice, averageCost, secType, accountName)
+		TABLE_NAME = BROKER_PORTFOLIO
+		ENTRY_BROKER_PORTFOLIO = INSERT_REPLACE_IN_TABLE(symbol, complete_symbol_type, holding_type, quantity, marketValue, costPrice, gnloss, marketPrice, averageCost, secType, accountName)
 		Index = TABLE_LOCAL_PORTFOLIO.symbol && TABLE_LOCAL_PORTFOLIO.secType && TABLE_LOCAL_PORTFOLIO.currency
 		ENTRY_LOCAL_PORTFOLIO = TABLE_LOCAL_PORTFOLIO(Index)
-		Compare_Portfolio_IB_and_Local(ENTRY_IB_PORTFOLIO, ENTRY_LOCAL_PORTFOLIO)
+		Compare_Portfolio_BROKER_and_Local(ENTRY_BROKER_PORTFOLIO, ENTRY_LOCAL_PORTFOLIO)
 	endfor
 
 Background:
 	Fill_Execution
-	Fill_IB_Portfolio
+	Fill_BROKER_Portfolio

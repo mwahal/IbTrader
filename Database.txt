@@ -44,7 +44,7 @@ TABLE_LOCAL_PORTFOLIO
 	Same as ORDERS_PLACED
 
 
-IB_PORTFOLIO
+BROKER_PORTFOLIO
    symbol = VARCHAR(10)
    complete_symbol_type = VARCHAR(10) (INDEX)
    holding_type = VARCHAR(10)
