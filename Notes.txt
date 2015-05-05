@@ -14,13 +14,13 @@ Function: IS_OK_TO_PLACE_ORDER(symbol, trade_only_if_position, wait_for_open_ord
 			endif
 		endif
 
-		ENTRY_OPEN_ORDER = (OUTSTANDING_ORDERS.symbol == symbol)
+		ENTRY_OPEN_ORDER = (DB_OUTSTANDING_ORDERS.symbol == symbol)
 		if (ENTRY_OPEN_ORDER.open_order == TRUE) then
 			if wait_for_open_order_to_finish == TRUE then
 				return FALSE
 			endif
 			do
-				ENTRY_OPEN_ORDER = (OUTSTANDING_ORDERS.symbol == symbol)
+				ENTRY_OPEN_ORDER = (DB_OUTSTANDING_ORDERS.symbol == symbol)
 				if ENTRY_OPEN_ORDER.open_order == TRUE then
 					break_loop
 				endif
@@ -49,57 +49,60 @@ Function PlaceOrder(symbol, price_signal, secType, currency, qty, action, order_
 		verify symbol , qty, action, type 
 		Note the order id
 		Store it in the database with timestamp
-			Table - ORDERS_PLACED
-			   ENTRY = new Row()
+			Table - DB_ORDERS_PLACED
+			   ENTRY_ORDERS_PLACED = new Row()
 
-			   ENTRY.order_open_time = order_time
-			   ENTRY.price_signal = price_signal
+			   ENTRY_ORDERS_PLACED.order_open_time = order_time
+			   ENTRY_ORDERS_PLACED.price_signal = price_signal
 
-			   ENTRY.orderid = orderid
-			   ENTRY.symbol = symbol
-			   ENTRY.sectype = sectype
-			   ENTRY.currency = currency
-			   ENTRY.exchange = exchange
-			   ENTRY.qty_requested = qty_requested
-			   ENTRY.qty_filled = 0
-			   ENTRY.limit_price = limit_price
-			   ENTRY.order_action = order_action
-			   ENTRY.order_type = order_type
-			   ENTRY.account_number = account_number
-			   ENTRY.order_completed = FALSE
+			   ENTRY_ORDERS_PLACED.orderid = orderid
+			   ENTRY_ORDERS_PLACED.symbol = symbol
+			   ENTRY_ORDERS_PLACED.sectype = sectype
+			   ENTRY_ORDERS_PLACED.currency = currency
+			   ENTRY_ORDERS_PLACED.exchange = exchange
+			   ENTRY_ORDERS_PLACED.qty_requested = qty_requested
+			   ENTRY_ORDERS_PLACED.qty_filled = 0
+			   ENTRY_ORDERS_PLACED.limit_price = limit_price
+			   ENTRY_ORDERS_PLACED.order_action = order_action
+			   ENTRY_ORDERS_PLACED.order_type = order_type
+			   ENTRY_ORDERS_PLACED.account_number = account_number
+			   ENTRY_ORDERS_PLACED.order_completed = FALSE
 							
 
-			Table - OUTSTANDING_ORDERS
+			Table - DB_OUTSTANDING_ORDERS
 				ENTRY_OUTSTANDING_ORDERS.symbol = symbol
 				ENTRY_OUTSTANDING_ORDERS.is_order_open = TRUE
 				ENTRY_OUTSTANDING_ORDERS.order_open_time = time()
 			    ENTRY_OUTSTANDING_ORDERS.orderid = orderid
 
 
+Function Fill_All_Execution_Table:
+	
 Function Fill_Execution:
 
 	Connect to TWS
-	Fill Get_All_Executions[]
+	Get_All_Executions[] = Fill_All_Execution_Table()
 	if failed then
 		Update_Error_Table(FAILURE_CODE)
 		return FALSE
 	endif
-	for ENTRY_OUTSTANDING_ORDERS in the table OUTSTANDING_ORDERS
+	for ENTRY_OUTSTANDING_ORDERS in the table DB_OUTSTANDING_ORDERS
 		if ENTRY_OUTSTANDING_ORDERS.is_order_open is TRUE
-			ENTRY = (ORDERS_PLACED.orderid == ENTRY_OUTSTANDING_ORDERS.orderid)
-			orderid = ENTRY.orderid
-			qty_requested = ENTRY.qty_requested
+			ENTRY_ORDERS_PLACED = (DB_ORDERS_PLACED.orderid == ENTRY_OUTSTANDING_ORDERS.orderid)
+			orderid = ENTRY_ORDERS_PLACED.orderid
+			qty_requested = ENTRY_ORDERS_PLACED.qty_requested
 			qty_filled = Get_All_Executions[orderid].qty_filled
 			if (qty_requested == qty_filled) then
-				ENTRY.order_completed = TRUE
-				ENTRY.qty_filled = qty_filled
-				ENTRY.order_filled_time = Get_All_Executions[orderid].fill_time[LAST]
-                                ENTRY.holding_type = order_action == BUY  ? LONG : SHORT
+				ENTRY_ORDERS_PLACED.order_completed = TRUE
+				ENTRY_ORDERS_PLACED.qty_filled = qty_filled
+				NumExecs = Get_All_Executions[orderid].NumExecs
+				ENTRY_ORDERS_PLACED.order_filled_time = Get_All_Executions[orderid].fill_time[NumExecs]
+				ENTRY_ORDERS_PLACED.holding_type = ENTRY_ORDERS_PLACED.order_action == BUY  ? LONG : SHORT
 				ENTRY_OUTSTANDING_ORDERS.is_order_open = FALSE
-				ENTRY_OUTSTANDING_ORDERS.order_filled_time = ENTRY.order_filled_time
-				SAVE(ENTRY_OUTSTANDING_ORDERS)
-				DELETE(ENTRY_OUTSTANDING_ORDERS)
-				Update_Local_Portfolio(ENTRY)
+				ENTRY_OUTSTANDING_ORDERS.order_filled_time = ENTRY_ORDERS_PLACED.order_filled_time
+				Update_Local_Portfolio(DB_LOCAL_PORTFOLIO, ENTRY_OUTSTANDING_ORDERS)
+				SAVE(DB_ALL_OUTSTANDING_ORDERS, ENTRY_OUTSTANDING_ORDERS)
+				DELETE(DB_OUTSTANDING_ORDERS, ENTRY_OUTSTANDING_ORDERS)
 			endif
 		endif
 	endfor
@@ -108,9 +111,9 @@ Function Fill_Execution:
 
 Function Update_Local_Portfolio(ENTRY_ORDERS_PLACED)
 	Index = ENTRY_ORDERS_PLACED.symbol && ENTRY_ORDERS_PLACED.secType && ENTRY_ORDERS_PLACED.currency
-	ENTRY_LOCAL_PORTFOLIO = TABLE_LOCAL_PORTFOLIO(Index)
+	ENTRY_LOCAL_PORTFOLIO = DB_LOCAL_PORTFOLIO(Index)
 	If ENTRY_LOCAL_PORTFOLIO is EMPTY then
-		Create a new row in TABLE_LOCAL_PORTFOLIO
+		Create a new row in DB_LOCAL_PORTFOLIO
 		Insert(ENTRY_ORDERS_PLACED)
 		return
 	endif
@@ -130,10 +133,10 @@ Function Fill_Broker_Portfolio
 	Portfolio[] = Get_All_Portfolio()
 	for all entries in Portfolio
 
-		TABLE_NAME = BROKER_PORTFOLIO
-		ENTRY_BROKER_PORTFOLIO = INSERT_REPLACE_IN_TABLE(symbol, complete_symbol_type, holding_type, quantity, marketValue, costPrice, gnloss, marketPrice, averageCost, secType, accountName)
-		Index = TABLE_LOCAL_PORTFOLIO.symbol && TABLE_LOCAL_PORTFOLIO.secType && TABLE_LOCAL_PORTFOLIO.currency
-		ENTRY_LOCAL_PORTFOLIO = TABLE_LOCAL_PORTFOLIO(Index)
+		TABLE_NAME = DB_BROKER_PORTFOLIO
+		ENTRY_BROKER_PORTFOLIO = INSERT_REPLACE_IN_TABLE(DB_BROKER_PORTFOLIO, symbol, complete_symbol_type, holding_type, quantity, marketValue, costPrice, gnloss, marketPrice, averageCost, secType, accountName)
+		Index = DB_LOCAL_PORTFOLIO.symbol && DB_LOCAL_PORTFOLIO.secType && DB_LOCAL_PORTFOLIO.currency
+		ENTRY_LOCAL_PORTFOLIO = DB_LOCAL_PORTFOLIO(Index)
 		Compare_Portfolio_BROKER_and_Local(ENTRY_BROKER_PORTFOLIO, ENTRY_LOCAL_PORTFOLIO)
 	endfor
 

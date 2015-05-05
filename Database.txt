@@ -56,3 +56,21 @@ BROKER_PORTFOLIO
    averageCost = DECIMAL(10,4)
    accountName = VARCHAR(10)
 
+
+EXEC_REPORTS
+
+#EUR {'orderid': '1', 'account': 'DU226708', 'execprice': 1.11865, 'exchange': 'IDEALPRO', 'symbol': 'EUR', 'permid': 2137440949, 'execid': '0001f4e8.55493475.01.01', 'clientid': '8899', 'qty': 1000000, 'avgprice': 1.11865, 'execshares': 1000000, 'expiry': '', 'side': 'SLD', 'times': '20150505  15:01:53'}
+	orderid = INT
+	symbol = VARCHAR(10)
+	account_number = VARCHAR(10)
+	execprice = DECIMAL(10,4)
+	exchange = VARCHAR(10)
+	permid = INT
+	execid = VARCHAR(32)
+	clientid = INT
+	qty_filled = INT
+	avgprice = DECIMAL(10,4)
+	execshares = INT
+	expiry = VARCHAR(20)
+	side = VARCHAR(10)
+	exectime = DATETIME

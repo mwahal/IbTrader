@@ -1,0 +1,7 @@
+### execution reports ###
+EUR {'orderid': '1', 'account': 'DU226708', 'execprice': 1.11865, 'exchange': 'IDEALPRO', 'symbol': 'EUR', 'permid': 2137440949, 'execid': '0001f4e8.55493475.01.01', 'clientid': '8899', 'qty': 1000000, 'avgprice': 1.11865, 'execshares': 1000000, 'expiry': '', 'side': 'SLD', 'times': '20150505  15:01:53'}
+EUR {'orderid': '1', 'account': 'DU226708', 'execprice': 1.11865, 'exchange': 'IDEALPRO', 'symbol': 'EUR', 'permid': 2137440949, 'execid': '0001f4e8.55493479.01.01', 'clientid': '8899', 'qty': 1500000, 'avgprice': 1.11865, 'execshares': 500000, 'expiry': '', 'side': 'SLD', 'times': '20150505  15:02:07'}
+EUR {'orderid': '1', 'account': 'DU226708', 'execprice': 1.11865, 'exchange': 'IDEALPRO', 'symbol': 'EUR', 'permid': 2137440949, 'execid': '0001f4e8.5549347b.01.01', 'clientid': '8899', 'qty': 2500000, 'avgprice': 1.11865, 'execshares': 1000000, 'expiry': '', 'side': 'SLD', 'times': '20150505  15:02:16'}
+
+### portfolio reports ###
+EUR EUR.USD LONG 5000000 5592374.8 5436192.0 156182.8 1.11847495 1.0872384 CASH DU226708
