@@ -1,3 +1,4 @@
+#!/usr/bin/python
 '''IBTrader is based on SWIG generated TWS wrapper to communicate with Interactive Brokers.
 https://pypi.python.org/pypi/swigibpy/0.4.1
 
@@ -51,7 +52,7 @@ def get_open_orders():
     
     while not request_finished:
         if (time.time() - start_time) > MAX_WAIT_SECONDS:
-            ## You should have thought that IB would teldl you we had finished
+            ## You should have thought that IB would told you we had finished
             request_finished=True
             is_request_open_order=False
         pass
@@ -121,24 +122,32 @@ def get_IB_positions():
 
        
 
-def place_order(symbol, secType, exchange, currency, action, lmtPrice, orderType, totalQuantity, user_account):
+def place_order(symbol, secType, exchange, primaryExchange, currency, action, lmtPrice, orderType, totalQuantity, user_account):
 
     global debug
     global order
     global account_number
     global args
+    global is_placing_order
+    global global_errorString
+
+    is_placing_order = True
+    if primaryExchange == '':
+       primaryExchange = exchange
     contract = Contract()
     contract.symbol = symbol
     contract.secType = secType
     contract.exchange = exchange
+    contract.primaryExchange = primaryExchange
     contract.currency = currency
     if debug:
-       print("place_order : Contract.symbol = %s secType = %s exchange = %s currency = %s" % (symbol, secType, exchange, currency))
+       print("place_order : Contract.symbol = %s secType = %s exchange = %s primaryExchange = %s currency = %s" % (symbol, secType, exchange, primaryExchange, currency))
 
     if debug:
        print('Waiting for valid order id')
     order_id = callback.order_ids.get(timeout=WAIT_TIME)
     if not order_id:
+        is_placing_order = False
         raise RuntimeError('Failed to receive order id after %ds' % WAIT_TIME)
 
 
@@ -150,8 +159,8 @@ def place_order(symbol, secType, exchange, currency, action, lmtPrice, orderType
 
 
     if debug:
-       print("Placing order for %d %s's @%s (id: %d)" % (order.totalQuantity,
-                                              contract.symbol, contract.exchange, order_id))
+       print("Placing order for %d %s's @%s(%s) (id: %d) Action %s Type %s LimitPrice %s" % (order.totalQuantity,
+                                              contract.symbol, contract.exchange, contract.primaryExchange, order_id,  order.action, order.orderType, order.lmtPrice))
 
 # Place the order
     tws.placeOrder(
@@ -161,7 +170,13 @@ def place_order(symbol, secType, exchange, currency, action, lmtPrice, orderType
     )
 
     if args.no_wait_for_complete:
-        print "PlacedOrder %d Symbol %s Qty %d Limit %d Action %s Type %s  Account %s SecType %s Exchange %s Currency %s" % (order_id, symbol, order.totalQuantity,  lmtPrice, action, orderType, user_account, secType, exchange, currency)
+        time.sleep(2)
+        if iserror:
+           is_placing_order = False
+           print "Error placing order %d Message = %s Symbol %s Qty %d Limit %d Action %s Type %s  Account %s SecType %s Exchange %s PrimaryExchange %s Currency %s" % (order_id, global_errorString, symbol, order.totalQuantity,  lmtPrice, action, orderType, user_account, secType, exchange, primaryExchange, currency)
+        else:
+           print "PlacedOrder %d Symbol %s Qty %d Limit %d Action %s Type %s  Account %s SecType %s Exchange %s PrimaryExchange %s Currency %s" % (order_id, symbol, order.totalQuantity,  lmtPrice, action, orderType, user_account, secType, exchange, primaryExchange, currency)
+
         if debug:
             print "Not waiting for order to be completed"
         return
@@ -185,6 +200,7 @@ def place_order(symbol, secType, exchange, currency, action, lmtPrice, orderType
     if debug:
        print("\nDisconnecting...")
 
+    is_placing_order = False
     print "%s " % contract.symbol,
     print "%d " % order.totalQuantity,
     print "%s " % order.action,
@@ -274,6 +290,7 @@ class IBClient(EWrapper):
         portdict=dict(contract=contract, symbol=sym , this_symbol=contract.symbol, expiry=contract.expiry, 
                        secType=contract.secType, currency=contract.currency,
                        exchange=contract.exchange,quantity=position,
+                       primaryExchange = contract.primaryExchange,
                        marketPrice=marketPrice, marketValue= marketValue, averageCost=averageCost,
                        curr_action=curr_action, flip_action=flip_action,
                        unrealizedPNL=unrealizedPNL, realizedPNL=realizedPNL, accountName=accountName) 
@@ -281,7 +298,7 @@ class IBClient(EWrapper):
         portfolio_holdings[sym] = portdict
         #portfolio_holdings[sym] = (contract.symbol, contract.expiry, position, marketPrice, marketValue, averageCost, unrealizedPNL, realizedPNL, accountName, contract.currency)
         portfolio_structure.append((sym, contract.expiry, position, marketPrice, marketValue, averageCost, 
-                                    unrealizedPNL, realizedPNL, accountName, contract.currency))
+                                    unrealizedPNL, realizedPNL, accountName, contract.currency, contract.exchange, contract.primaryExchange))
 
     def error(self, id, errorCode, errorString):
         """
@@ -296,17 +313,22 @@ class IBClient(EWrapper):
 
         """
         global iserror
+        global errormsg
         global finished
         global request_finished
+        global is_placing_order
+        global global_errorString
 
         ## Any errors not on this list we just treat as information
         ERRORS_TO_TRIGGER=[201, 103, 502, 504, 509, 200, 162, 420, 2105, 1100, 478, 201, 399]
+        global_errorString = errorString
        
         #print "ERROR errorCode = %d errorString = %s" % (errorCode, errorString)
         if errorCode in ERRORS_TO_TRIGGER:
             iserror=True
             errormsg="IB error id %d errorcode %d string %s" %(id, errorCode, errorString)
-            print errormsg
+            if is_placing_order == False:
+                print errormsg
             finished=True  
             request_finished=True  
            
@@ -480,9 +502,16 @@ class IBClient(EWrapper):
         ## Get a selection of interesting things about the order
         if debug:
            print 'openOrder Order opened for %s orderID %s ' % (contract.symbol, orderID)
-        orderdict=dict(contract=contract, symbol=contract.symbol , expiry=contract.expiry,  qty=int(order.totalQuantity) , 
+        if contract.exchange == 'IDEALPRO' and contract.exchange == 'IDEAL':
+           localSymbol = contract.symbol + "." + contract.currency
+        else:
+           localSymbol = contract.localSymbol
+           
+
+        orderdict=dict(contract=contract, symbol=contract.symbol , localSymbol = localSymbol, orderState_status = orderState.status, expiry=contract.expiry, 
+                       qty=int(order.totalQuantity) ,  limitPrice = order.lmtPrice ,
                        side=order.action , orderid=orderID, clientid=order.clientId , secType=contract.secType, currency=contract.currency,
-                       exchange=contract.exchange,quantity=order.totalQuantity, orderType=order.orderType, action=order.action) 
+                       exchange=contract.exchange, primaryExchange=contract.primaryExchange, quantity=order.totalQuantity, orderType=order.orderType, action=order.action) 
         
         order_structure[orderID] = orderdict
 
@@ -543,6 +572,8 @@ WAIT_TIME = 300
 MAX_WAIT_SECONDS = 30
 order_structure = {}
 MEANINGLESS_NUMBER=1729
+is_placing_order = False
+errormsg = ""
 
 # Instantiate our callback object
 callback = IBClient()
@@ -562,6 +593,7 @@ parser.add_argument('-sm', '--short_mkt', action='store_true', help="Place a Sho
 parser.add_argument('-sym', '--symbol', default='not_a_symbol', help="Symbol")
 parser.add_argument('-ot', '--order_secType', default='not_a_secType', help="Security Type [CASH|STK|FUT|OPT|etc]")
 parser.add_argument('-oe', '--order_exchange', default='not_a_exchange', help="Exchange [IDEALPRO|SMART]")
+parser.add_argument('-ope', '--order_primaryexchange', default='not_a_primaryexchange', help="Primary Exchange [IDEALPRO|SMART]")
 parser.add_argument('-oc', '--order_currency', default='not_a_currency', help="Currency USD")
 parser.add_argument('-oa', '--order_action', default='not_a_action', help="Order action BUY|SELL")
 parser.add_argument('-ol', '--order_limit_price', default='not_a_limit_price', help="Limit Price for the order, ignored in case of market order")
@@ -605,6 +637,7 @@ if debug:
     print "trade_options ", args.trade_options
     print "order_secType ", args.order_secType
     print "order_exchange ", args.order_exchange
+    print "order_primaryexchange ", args.order_primaryexchange
     print "order_currency ", args.order_currency
     print "order_action ", args.order_action
     print "order_limit_price ", args.order_limit_price
@@ -657,11 +690,16 @@ if args.print_sym_position and args.symbol == 'not_a_symbol':
 # callback object so TWS can respond.
 tws = EPosixClientSocket(callback)
 
-if args.tws_clientid == 'not_a_tws_clientid':
-   args.tws_clientid = tws_clientid
+if args.tws_clientid != 'not_a_tws_clientid':
+   tws_clientid = int(args.tws_clientid)
+
+if debug:
+   print 'tws_clientid is %d ', tws_clientid
+
+
 
 # Connect to tws running on localhost
-if not tws.eConnect(tws_host, tcp_port, args.tws_clientid):
+if not tws.eConnect(tws_host, tcp_port, tws_clientid):
     raise RuntimeError('Failed to connect to TWS')
 
 if args.new_order or args.trade_stock or args.trade_forex or args.trade_options:
@@ -708,6 +746,7 @@ if args.new_order or args.trade_stock or args.trade_forex or args.trade_options:
     order_symbol = args.symbol
     order_secType = args.order_secType
     order_exchange = args.order_exchange
+    order_primaryexchange = args.order_primaryexchange
     order_currency = args.order_currency
     order_action = args.order_action
     order_limit_price = args.order_limit_price
@@ -748,7 +787,10 @@ if args.new_order or args.trade_stock or args.trade_forex or args.trade_options:
     else:
        order_limit_price = float(args.order_limit_price)
 
-    place_order(order_symbol, order_secType, order_exchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number)
+    if order_primaryexchange == 'not_a_primaryexchange':
+       order_primaryexchange = order_exchange
+
+    place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number)
 
 if args.print_executions or args.print_sym_executions or args.print_order_id:
    if args.print_order_id and args.order_id == 'not_a_order_id':
@@ -824,15 +866,20 @@ if args.close_all_positions or args.close_sym_position:
             order_limit_price = 0
             if order_exchange == '':
                order_exchange = get_order_exchange(order_symbol, order_secType, order_currency)
-            place_order(order_symbol, order_secType, order_exchange, order_currency, order_action, order_limit_price, order_type, order_quantity, account_number)
-
+            order_primaryexchange = order_exchange
+            place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, account_number)
+#24 {'orderid': 24L, 'exchange': 'IDEALPRO', 'secType': 'CASH', 'orderType': 'LMT', 'primaryExchange': '', 'clientid': 8899L, 'qty': 100000, 'currency': 'USD', 'contract': <swigibpy.Contract; proxy of <Swig Object of type 'Contract *' at 0x7fb0883a2480> >, 'action': 'BUY', 'expiry': '', 'symbol': 'EUR', 'quantity': 100000L, 'side': 'BUY'}
 if args.print_open_orders or args.cancel_all_orders or args.cancel_sym_order:
     openorders = get_open_orders()
     if debug:
         print "Active orders: (should just be limit order)"
     for key, val in openorders.items():
-        print key, val
+#        print key, val
         sym = val["symbol"]
+        contract = val["contract"]
+        orderid = key
+        print "%d %s %s %s %s %s %s %s %s %s %s " % (key, sym, val["localSymbol"], val["orderState_status"], val["secType"], val["action"], val["orderType"], val["qty"], val["limitPrice"], val["currency"], val["exchange"])
+        
         if args.cancel_all_orders or (args.cancel_sym_order and args.symbol == sym):
             if debug:
                 print "Cancel order id %d symbol = %s" %  (key, sym)
