@@ -26,3 +26,7 @@ runeff -addts -fromall -sclbw -sclw -do_loess -scale_bandwidth_mult 1 -sdev 0.50
 runeff -addts -fromall -sclbw -sclw -do_loess -scale_bandwidth_mult 1 -sdev 0.50 -use_short_sdev -autobw -autobarmulti 1 -shortperiod 0   -tick UVXY_QQ   -fromdate 20130101 -slippage 0 -use_this_flds 30 -nef -mkcr OOO -maxlosspcnt -4 -okshort -skipbsma 30 -SKIPBS_MA_CPNT 0.01 -min_holding_minutes 0 -lev 1 -minutes 10
 
 
+## Error handling
+The contract description specified for MSFT is ambiguous.
+## Solution
+Specify exchange as ISLAND
