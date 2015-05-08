@@ -23,7 +23,7 @@ CREATE TABLE if not exists DB_ORDERS_PLACED (
    order_filled_time DATETIME not NULL,
    price_signal DECIMAL(10,4) not NULL,
    orderid  INT PRIMARY KEY,
-   symbol  VARCHAR(10) not NULL,
+   symbol  VARCHAR(20) not NULL,
    sectype  VARCHAR(10) not NULL,
    currency  VARCHAR(10) not NULL,
    exchange  VARCHAR(10) not NULL,
@@ -40,9 +40,10 @@ CREATE TABLE if not exists DB_ORDERS_PLACED (
 
 #PRIMARY KEY (orderid)
 CREATE TABLE if not exists DB_OUTSTANDING_ORDERS (
-   symbol   VARCHAR(10) not NULL,
+   symbol   VARCHAR(20) not NULL,
    orderid INT PRIMARY KEY,
    is_order_open   BOOLEAN not NULL,
+   is_order_canceled   BOOLEAN not NULL,
    order_open_time   DATETIME not NULL,
    order_filled_time   DATETIME not NULL
 );
@@ -54,7 +55,7 @@ CREATE TABLE if not exists DB_LOCAL_PORTFOLIO (
    order_filled_time DATETIME not NULL,
    price_signal DECIMAL(10,4) not NULL,
    orderid  INT PRIMARY KEY,
-   symbol  VARCHAR(10) not NULL,
+   symbol  VARCHAR(20) not NULL,
    sectype  VARCHAR(10) not NULL,
    currency  VARCHAR(10) not NULL,
    exchange  VARCHAR(10) not NULL,
@@ -70,7 +71,7 @@ CREATE TABLE if not exists DB_LOCAL_PORTFOLIO (
 );
 
 CREATE TABLE if not exists DB_BROKER_PORTFOLIO(
-   symbol   VARCHAR(10) not NULL,
+   symbol   VARCHAR(20) not NULL,
    complete_symbol_type   VARCHAR(32) not NULL,
    holding_type   VARCHAR(10) not NULL,
    quantity    INT not NULL,
@@ -85,7 +86,7 @@ CREATE TABLE if not exists DB_BROKER_PORTFOLIO(
 
 CREATE TABLE if not exists DB_BROKER_EXEC_REPORT(
 	orderid   INT not NULL,
-	symbol   VARCHAR(10) not NULL,
+	symbol   VARCHAR(20) not NULL,
 	account_number  VARCHAR(20) not NULL,
 	execprice   DECIMAL(10,4) not NULL,
 	exchange   VARCHAR(10) not NULL,
@@ -102,7 +103,7 @@ CREATE TABLE if not exists DB_BROKER_EXEC_REPORT(
 
 CREATE TABLE if not exists DB_GET_ALL_EXECUTIONS(
 	orderid   INT PRIMARY KEY,
-	symbol   VARCHAR(10) not NULL,
+	symbol   VARCHAR(20) not NULL,
 	side   VARCHAR(10) not NULL,
 	qty_filled   INT not NULL,
 	numexec   INT not NULL,
@@ -113,7 +114,7 @@ CREATE TABLE if not exists DB_GET_ALL_EXECUTIONS(
 
 CREATE TABLE if not exists DB_OPEN_ORDERS(
 	orderid   INT PRIMARY KEY,
-	symbol   VARCHAR(10) not NULL,
+	symbol   VARCHAR(20) not NULL,
     complete_symbol_type   VARCHAR(32) not NULL,
 	status VARCHAR(20) not NULL,
     sectype   VARCHAR(10) not NULL,

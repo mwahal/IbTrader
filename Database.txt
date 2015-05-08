@@ -18,7 +18,7 @@ DB_ORDERS_PLACED
    price_signal   DECIMAL(10,4)
 
    orderid   INT (INDEX)
-   symbol   VARCHAR(10)
+   symbol   VARCHAR(20)
    sectype   VARCHAR(10)
    currency   VARCHAR(10)
    exchange   VARCHAR(10)
@@ -34,9 +34,10 @@ DB_ORDERS_PLACED
 
 
 DB_OUTSTANDING_ORDERS
-   symbol   VARCHAR(10)
+   symbol   VARCHAR(20)
    orderid   INT (INDEX)
    is_order_open   BOOLEAN
+   is_order_canceled   BOOLEAN
    order_open_time   DATETIME
    order_filled_time   DATETIME
 			
@@ -46,7 +47,7 @@ DB_LOCAL_PORTFOLIO
 
 
 DB_BROKER_PORTFOLIO
-   symbol   VARCHAR(10)
+   symbol   VARCHAR(20)
    complete_symbol_type   VARCHAR(32) (INDEX)
    holding_type   VARCHAR(10)
    quantity    INT
@@ -62,7 +63,7 @@ DB_BROKER_EXEC_REPORT
 
 #EUR {'orderid': '1', 'account': 'DU226708', 'execprice': 1.11865, 'exchange': 'IDEALPRO', 'symbol': 'EUR', 'permid': 2137440949, 'execid': '0001f4e8.55493475.01.01', 'clientid': '8899', 'qty': 1000000, 'avgprice': 1.11865, 'execshares': 1000000, 'expiry': '', 'side': 'SLD', 'times': '20150505  15:01:53'}
 	orderid   INT
-	symbol   VARCHAR(10)
+	symbol   VARCHAR(20)
 	account_number   VARCHAR(10)
 	execprice   DECIMAL(10,4)
 	exchange   VARCHAR(10)
@@ -78,7 +79,7 @@ DB_BROKER_EXEC_REPORT
 
 DB_GET_ALL_EXECUTIONS
 	orderid   INT (INDEX)
-	symbol   VARCHAR(10)
+	symbol   VARCHAR(20)
 	side   VARCHAR(10)
 	qty_filled   INT
 	numexec   INT
@@ -88,7 +89,7 @@ DB_GET_ALL_EXECUTIONS
 #	24 EUR EUR.USD Submitted CASH BUY LMT 100000 1.01 USD IDEALPRO
 DB_OPEN_ORDERS
 	orderid   INT (INDEX)
-	symbol   VARCHAR(10)
+	symbol   VARCHAR(20)
     complete_symbol_type   VARCHAR(32) (INDEX)
 	status VARCHAR(20)
     sectype   VARCHAR(10)
