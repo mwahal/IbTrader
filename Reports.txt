@@ -5,3 +5,6 @@ EUR {'orderid': '1', 'account': 'DU226708', 'execprice': 1.11865, 'exchange': 'I
 
 ### portfolio reports ###
 EUR EUR.USD LONG 5000000 5592374.8 5436192.0 156182.8 1.11847495 1.0872384 CASH DU226708
+
+### Open Orders###
+24 EUR EUR.USD Submitted CASH BUY LMT 100000 1.01 USD IDEALPRO
