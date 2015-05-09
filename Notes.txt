@@ -6,18 +6,18 @@ Each account -
 	a unique account number to be passed
 
 
-Function CancelAllOpenOrder()
-	Fill_All_Open_Order()
+ENTRY Function CancelAllOpenOrder()
+	Fill_DB_All_Open_Order()
 
 	for ENTER_DB_OPEN_ORDERS in DB_OPEN_ORDERS
 		Cancel_Sym_Order_Update_DB(ENTER_DB_OPEN_ORDERS.localsymbol)
 	endfor
 
 
-Function CancelSymOpenOrder(symbol)
-	Fill_All_Open_Order()
+ENTRY Function CancelSymOpenOrder(symbol)
+	Fill_DB_All_Open_Order()
 	if FAILURE then
-		LogError(symbol, "Fill_All_Open_Order")
+		LogError(symbol, "Fill_DB_All_Open_Order")
 		return
 	endif
 	ENTER_DB_OPEN_ORDERS = (DB_OPEN_ORDERS.localsymbol == symbol)
@@ -62,7 +62,7 @@ Function: IS_OK_TO_PLACE_ORDER(symbol, trade_only_if_position, wait_for_open_ord
 				
 
 		
-Function PlaceOrder(symbol, price_signal, secType, currency, qty, action, order_type, limitprice, exchange, order_time)
+ENTRY Function PlaceOrder(symbol, price_signal, secType, currency, qty, action, order_type, limitprice, exchange, order_time)
 		
 	if IS_OK_TO_PLACE_ORDER(symbol, TRUE, TRUE) returns FALSE then
 		return FALSE
@@ -107,20 +107,19 @@ Function PlaceOrder(symbol, price_signal, secType, currency, qty, action, order_
 			ENTRY_OUTSTANDING_ORDERS.orderid = orderid
 			SAVE(DB_OUTSTANDING_ORDERS, ENTRY_OUTSTANDING_ORDERS)
 
-Function Fill_All_Open_Order:
-	PYTHON_get_all_open_orders()
+Function Fill_DB_All_Open_Order:
+	 ### all open orders report from Broker
+	openorder_array[] = PYTHON_get_all_open_orders()
 	if FAILURE then
 		Update_Error_Table(FAILURE_CODE)
 		return FALSE
 	endif
-	openorder_array[] ### all open orders report from Broker
 	all_orderids[] = 0
 	for oo in openorder_array[]
 		orderid = oo[orderid]
 		all_orderids[orderid]++
 		SAVE(DB_OPEN_ORDERS, oo)
 	endfor
-
 # remove old open entries which are expired now
 	for ENTRY_OPEN_ORDERS in DB_OPEN_ORDERS
 		oid = ENTRY.orderid
@@ -129,7 +128,7 @@ Function Fill_All_Open_Order:
 		endif
 	endfor
 
-Function Fill_All_Execution_Table:
+Function Fill_DB_All_Execution_Table:
 
 	PYTHON_request_all_executions()
 	if FAILURE then
@@ -172,9 +171,9 @@ Function Fill_All_Execution_Table:
 
 
 	
-Function Fill_Execution:
+Function Fill_DB_Execution:
 
-	Fill_All_Execution_Table()
+	Fill_DB_All_Execution_Table()
 	if FAILURE then
 		Update_Error_Table(FAILURE_CODE)
 		return FALSE
@@ -217,7 +216,7 @@ Function Update_Local_Portfolio(DB_LOCAL_PORTFOLIO, ENTRY_ORDERS_PLACED)
 		endif
 	endif
 
-Function Fill_Broker_Portfolio
+Function Fill_DB_Broker_Portfolio
 	Portfolio[] = PYTHON_get_all_portfolio()
 	if FAILURE then
 		Update_Error_Table(FAILURE_CODE)
@@ -234,6 +233,6 @@ Function Fill_Broker_Portfolio
 	endfor
 
 Background:
-	Fill_All_Open_Order
-	Fill_Execution
-	Fill_BROKER_Portfolio
+	Fill_DB_All_Open_Order
+	Fill_DB_Execution
+	Fill_DB_BROKER_Portfolio
