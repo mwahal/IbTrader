@@ -381,6 +381,10 @@ Function Read_DB_NEW_ORDER_TABLE:
 
 						ENTRY_DB_NEW_ORDER_TABLE.currentPrice = get_current_price(symbol)
 						sharestotrade = get_shares_quantity(symbol, leverage, Current_equity, ENTRY_DB_NEW_ORDER_TABLE.currentPrice)
+						if (sym_A == TRUE)
+							ENTRY_DB_GROUP.Shares_Requested_A = sharestotrade
+						else
+							ENTRY_DB_GROUP.Shares_Requested_B = sharestotrade
 						retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "LONG")
 						if (retcode != SUCCESS) then
 							continue
@@ -389,6 +393,10 @@ Function Read_DB_NEW_ORDER_TABLE:
 
 					else if (Position_HoldingType == "SHORT") then
 						sharestotrade = sharesholding
+						if (sym_A == TRUE)
+							ENTRY_DB_GROUP.Shares_Requested_A = sharestotrade
+						else
+							ENTRY_DB_GROUP.Shares_Requested_B = sharestotrade
 						retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "LONG")
 						if (retcode != SUCCESS) then
 							continue
@@ -421,6 +429,10 @@ Function Read_DB_NEW_ORDER_TABLE:
 
 						ENTRY_DB_NEW_ORDER_TABLE.currentPrice = get_current_price(symbol)
 						sharestotrade = get_shares_quantity(symbol, leverage, Current_equity, ENTRY_DB_NEW_ORDER_TABLE.currentPrice)
+						if (sym_A == TRUE)
+							ENTRY_DB_GROUP.Shares_Requested_A = sharestotrade
+						else
+							ENTRY_DB_GROUP.Shares_Requested_B = sharestotrade
 						retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "SELL")
 						if (retcode != SUCCESS) then
 							continue
@@ -429,6 +441,10 @@ Function Read_DB_NEW_ORDER_TABLE:
 
 					else if (Position_HoldingType == "Long") then
 						sharestotrade = sharesholding
+						if (sym_A == TRUE)
+							ENTRY_DB_GROUP.Shares_Requested_A = sharestotrade
+						else
+							ENTRY_DB_GROUP.Shares_Requested_B = sharestotrade
 						retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "SELL")
 						if (retcode != SUCCESS) then
 							continue
@@ -483,6 +499,19 @@ Function FillDBGroupEntries(ENTRY_DB_GROUP, ENTRY_GET_ALL_EXECUTIONS)
 ### fill the shares filled, prices etc etc
 ## A or B
 # total etc etc
+	ENTRY_DB_GROUP.WaitingTobeFilled = FALSE
+	Fill in PAIR_POSITION_TYPE
+	Fill in Shares_Filled_A/B
+	Fill in Shares_Remaining_A/B
+	Fill in Position_HoldingType_A/B
+	Fill in Market_Value_A/B
+	Fill in Partial_Fill_A/B
+	Fill in Total_Shares_BUY_A/B
+    Fill in Total_Shares_SELL_A/B
+    Fill in Total_MarketValue_BUY_A/B
+    Fill in Total_MarketValue_SELL_A/B
+    Fill in Total_MarketValue_Traded_A/B
+    Fill in Total_Commission_A/B
 
 
 Function CompleteExecutionDBGroup(ENTRY_GET_ALL_EXECUTIONS)
