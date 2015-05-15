@@ -35,6 +35,9 @@ CREATE TABLE if not exists DB_ORDERS_PLACED (
    account_number  VARCHAR(20) not NULL,
    holding_type  VARCHAR(10) not NULL,
    order_completed  BOOLEAN not NULL,
+   order_partial_filled   BOOLEAN not NULL,
+   commission DECIMAL(10,2) not NULL,
+   totalvalue DECIMAL(10,2) not NULL,
    avgprice  DECIMAL(10,4) not NULL
 );
 
@@ -109,6 +112,8 @@ CREATE TABLE if not exists DB_GET_ALL_EXECUTIONS(
 	numexec   INT not NULL,
 	avgprice   DECIMAL(10,4) not NULL,
 	last_exectime   DATETIME not NULL
+	total_value INT not NULL, 
+	commissions DECIMAL(10,2) not NULL 
 );
 
 

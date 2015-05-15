@@ -62,28 +62,51 @@ Function: IS_OK_TO_PLACE_ORDER(symbol, trade_only_if_position, wait_for_open_ord
 				
 
 		
-ENTRY Function PlaceOrder(symbol, price_signal, secType, currency, qty, action, order_type, limitprice, exchange, order_time)
+Function PlaceOrder(ENTRY_DB_NEW_ORDER_TABLE)
+	
+# symbol, signalPrice, secType, currency, qty, action, order_type, limitprice, exchange, order_time)
+	symbol = ENTRY_DB_NEW_ORDER_TABLE.symbol
 		
 	if IS_OK_TO_PLACE_ORDER(symbol, TRUE, TRUE) returns FALSE then
-		return FALSE
+		return -1
 	endif
 		
-	PYTHON_place_asynchronous_order(symbol, price_signal, secType, currency, qty, action, order_type, limitprice, exchange, order_time)
+	signalPrice = ENTRY_DB_NEW_ORDER_TABLE.signalPrice
+	secType = ENTRY_DB_NEW_ORDER_TABLE.secType
+	currency = ENTRY_DB_NEW_ORDER_TABLE.currency
+	exchange = ENTRY_DB_NEW_ORDER_TABLE.exchange
+	qty = ENTRY_DB_NEW_ORDER_TABLE.sharestotrade
+	action = ENTRY_DB_NEW_ORDER_TABLE.action
+	order_type = ENTRY_DB_NEW_ORDER_TABLE.orderType
+	limitprice = ENTRY_DB_NEW_ORDER_TABLE.limitPrice
+	group_number = ENTRY_DB_NEW_ORDER_TABLE.group_number
+	order_time = TIME()
+
+	json = PYTHON_place_asynchronous_order(symbol, signalPrice, secType, currency, qty, action, order_type, limitprice, exchange, order_time)
 
 	if FAILURE then
 		LogError(FAILURE_CODE, "Order", params[])
 		return FALSE
 	endif
-	verify symbol , qty, action, type 
-	Note the order id
+
+	match_order(json, symbol, action, order_type, exchange, currency, secType)
+	if FAIL then
+		return -1
+	endif
+	orderid = get_order_id(json)
+	ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Placed"
+	ENTRY_DB_NEW_ORDER_TABLE.orderid = orderid
+	Update_DB_GROUP(ENTRY_DB_NEW_ORDER_TABLE.group_number, "Placed")
+
 	Store it in the database with timestamp
 		Table - DB_ORDERS_PLACED
 		   ENTRY_ORDERS_PLACED = new Row(DB_ORDERS_PLACED)
 
 		   ENTRY_ORDERS_PLACED.order_open_time = order_time
-		   ENTRY_ORDERS_PLACED.price_signal = price_signal
+		   ENTRY_ORDERS_PLACED.signalPrice = signalPrice
 
 		   ENTRY_ORDERS_PLACED.orderid = orderid
+		   ENTRY_ORDERS_PLACED.group_number = group_number
 		   ENTRY_ORDERS_PLACED.symbol = symbol
 		   ENTRY_ORDERS_PLACED.sectype = sectype
 		   ENTRY_ORDERS_PLACED.currency = currency
@@ -95,6 +118,7 @@ ENTRY Function PlaceOrder(symbol, price_signal, secType, currency, qty, action, 
 		   ENTRY_ORDERS_PLACED.order_type = order_type
 		   ENTRY_ORDERS_PLACED.account_number = account_number
 		   ENTRY_ORDERS_PLACED.order_completed = FALSE
+		   ENTRY_ORDERS_PLACED.order_partial_filled = FALSE
 		   SAVE(DB_ORDERS_PLACED, ENTRY_ORDERS_PLACED)
 						
 
@@ -106,6 +130,8 @@ ENTRY Function PlaceOrder(symbol, price_signal, secType, currency, qty, action, 
 			ENTRY_OUTSTANDING_ORDERS.order_open_time = time()
 			ENTRY_OUTSTANDING_ORDERS.orderid = orderid
 			SAVE(DB_OUTSTANDING_ORDERS, ENTRY_OUTSTANDING_ORDERS)
+
+		return orderid
 
 Function Fill_DB_All_Open_Order:
 	 ### all open orders report from Broker
@@ -147,11 +173,13 @@ Function Fill_DB_All_Execution_Table:
 		qty_filled = 0
 		last_exectime = 0
 		numexec = 0
+		total_value = 0
 		for exec in (DB_BROKER_EXEC_REPORT.orderid == oid)
 			symbol = exec.symbol
 			side = exec.side
 			execshares = exec.execshares
 			execprice = exec.execprice
+			total_value += (execshares*execprice)
 			avgprice = exec.avgprice
 			qty_filled = MAX(exec.qty_filled, qty_filled)
 			last_exectime = MAX(exec.exectime, last_exectime)
@@ -164,7 +192,9 @@ Function Fill_DB_All_Execution_Table:
 		ENTRY_GET_ALL_EXECUTIONS.qty_filled = qty_filled
 		ENTRY_GET_ALL_EXECUTIONS.numexec = numexec
 		ENTRY_GET_ALL_EXECUTIONS.avgprice = avgprice
+		ENTRY_GET_ALL_EXECUTIONS.total_value = total_value
 		ENTRY_GET_ALL_EXECUTIONS.last_exectime = last_exectime
+		ENTRY_GET_ALL_EXECUTIONS.commissions = Get_Commission_Report(oid)
 		SAVE(DB_GET_ALL_EXECUTIONS, ENTRY_GET_ALL_EXECUTIONS)
 	endfor
 
@@ -175,7 +205,7 @@ Function Fill_DB_Execution:
 
 	Fill_DB_All_Execution_Table()
 	if FAILURE then
-		Update_Error_Table(FAILURE_CODE)
+		Update_Error_Table(FAILURE_CODE, "Fill_DB_All_Execution_Table")
 		return FALSE
 	endif
 	for ENTRY_OUTSTANDING_ORDERS in the table DB_OUTSTANDING_ORDERS
@@ -185,14 +215,21 @@ Function Fill_DB_Execution:
 			qty_requested = ENTRY_ORDERS_PLACED.qty_requested
 			ENTRY_GET_ALL_EXECUTIONS = (DB_GET_ALL_EXECUTIONS.orderid == orderid)
 			qty_filled = ENTRY_GET_ALL_EXECUTIONS.qty_filled
-			if (qty_requested == qty_filled) then
+# handle partial execytion here
+# fill DB_GROUP
+			if (qty_requested == qty_filled || ENTRY_OUTSTANDING_ORDERS.is_order_canceled == TRUE) then
+				ENTRY_GET_ALL_EXECUTIONS.group_number = ENTRY_ORDERS_PLACED.group_number
 				ENTRY_ORDERS_PLACED.order_completed = TRUE
+				if (qty_requested != qty_filled && ENTRY_OUTSTANDING_ORDERS.is_order_canceled == TRUE)
+					ENTRY_ORDERS_PLACED.order_partial_filled = TRUE
+				endif
 				ENTRY_ORDERS_PLACED.qty_filled = qty_filled
 				ENTRY_ORDERS_PLACED.avgprice = ENTRY_GET_ALL_EXECUTIONS.avgprice
 				ENTRY_ORDERS_PLACED.order_filled_time = ENTRY_GET_ALL_EXECUTIONS.last_exectime
 				ENTRY_ORDERS_PLACED.holding_type = ENTRY_ORDERS_PLACED.order_action == BUY  ? LONG : SHORT
 				ENTRY_OUTSTANDING_ORDERS.is_order_open = FALSE
 				ENTRY_OUTSTANDING_ORDERS.order_filled_time = ENTRY_ORDERS_PLACED.order_filled_time
+				CompleteExecutionDBGroup(ENTRY_GET_ALL_EXECUTIONS)
 				Update_Local_Portfolio(DB_LOCAL_PORTFOLIO, ENTRY_ORDERS_PLACED)
 				SAVE(DB_HISTORY_OUTSTANDING_ORDERS, ENTRY_OUTSTANDING_ORDERS)
 				DELETE(DB_OUTSTANDING_ORDERS, ENTRY_OUTSTANDING_ORDERS)
@@ -231,6 +268,267 @@ Function Fill_DB_Broker_Portfolio
 		ENTRY_LOCAL_PORTFOLIO = DB_LOCAL_PORTFOLIO(Index)
 		Compare_Portfolio_BROKER_and_Local(ENTRY_BROKER_PORTFOLIO, ENTRY_LOCAL_PORTFOLIO)
 	endfor
+
+
+Function CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, LongShort)
+
+	if sharestotrade == 0 then
+		DELETE(DB_NEW_ORDER_TABLE, ENTRY_DB_NEW_ORDER_TABLE)
+		if (pair_position_type == 'CASH') then
+			dump_table(DB_GROUP, "Shares to buy is 0")
+			return DB_GROUP_INCONSISTENT_STATE
+		endif
+	endif
+	ENTRY_DB_GROUP.NewOrderType = ENTRY_DB_NEW_ORDER_TABLE.orderType
+	ENTRY_DB_GROUP.NewOrderAction = LongShort
+	ENTRY_DB_GROUP.NewOrderState = "Initialized"
+
+	ENTRY_DB_NEW_ORDER_TABLE.sharestotrade = sharestotrade
+	ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Initialized"
+	ENTRY_DB_NEW_ORDER_TABLE.group_number = ENTRY_DB_GROUP.group_number
+
+	oid = PlaceOrder(ENTRY_DB_NEW_ORDER_TABLE)
+	if (IS_VALID_ORDERID(oid) == FALSE) then
+		return INVALID_ORDERID
+	endif
+
+
+	if (ENTRY_DB_GROUP.PendingHoldOrderNumber == ENTRY_DB_NEW_ORDER_TABLE.order_number) then
+		ENTRY_DB_GROUP.PendingHoldOrderID = oid
+	endif
+	ENTRY_DB_GROUP.LastOrderID = oid
+	ENTRY_DB_GROUP.WaitingTobeFilled = TRUE
+	return SUCCESS
+
+Function Read_DB_NEW_ORDER_TABLE:
+	for ENTRY_DB_NEW_ORDER_TABLE in DB_NEW_ORDER_TABLE
+		if ENTRY_DB_NEW_ORDER_TABLE.orderstatus == 'OnHold' then
+		   continue # the for loop
+		endif
+		if ENTRY_DB_NEW_ORDER_TABLE.orderstatus != 'Initialized' then
+		   continue # the for loop
+		endif
+		symbol = ENTRY_DB_NEW_ORDER_TABLE.symbol
+		ENTRY_DB_GROUP = (DB_GROUP.Symbol_A == symbol || DB_GROUP.Symbol_B == symbol)
+		if ENTRY_DB_GROUP == NULL then
+			dump_table(DB_GROUP, "PairSymbolsNotFound " + symbol + " " + pair_symbol)
+			return DB_GROUP_INCONSISTENT_STATE
+		endif
+		pair_position_type = ENTRY_DB_GROUP.PAIR_POSITION_TYPE
+		if pair_position_type == 'BUSTED' OR ENTRY_DB_GROUP == TRUE then
+			continue # the for loop
+		endif
+		if (ENTRY_DB_GROUP.IS_PAIR_TRADING == TRUE) then
+			if ENTRY_DB_GROUP.Symbol_A == 'NONE' || ENTRY_DB_GROUP.Symbol_B == 'NONE' then
+				dump_table(DB_GROUP, "Invalid IS_PAIR_TRADING state")
+				return DB_GROUP_INCONSISTENT_STATE
+			endif
+			if pair_position_type == "CASH" then
+				if ENTRY_DB_GROUP.Position_HoldingType_A != "NONE" || ENTRY_DB_GROUP.Position_HoldingType_B != "NONE" then
+					dump_table(DB_GROUP, "Invalid PAIR_POSITION_TYPE")
+					return DB_GROUP_INCONSISTENT_STATE
+				endif
+			endif
+			Current_equity = ENTRY_DB_GROUP.Current_equity
+			
+			if ENTRY_DB_GROUP.Symbol_A == symbol then
+				sym_A = TRUE
+				sym_B = FALSE
+			else
+				sym_B = TRUE
+				sym_A = FALSE
+			endif
+
+
+			# state machine 1 or 2
+			if (pair_position_type == "CASH") OR
+				(sym_A  == TRUE && pair_position_type == 'A') OR
+				(sym_B  == TRUE && pair_position_type == 'B' ) then
+
+				leverage = (sym_A == TRUE) ? ENTRY_DB_GROUP.Leverage_A : ENTRY_DB_GROUP.Leverage_B
+				ok_long = (sym_A == TRUE) ? ENTRY_DB_GROUP.LongAllow_A : ENTRY_DB_GROUP.LongAllow_B
+				ok_short = (sym_A == TRUE) ? ENTRY_DB_GROUP.ShortAllow_A : ENTRY_DB_GROUP.ShortAllow_B
+				ENTRY_DB_NEW_ORDER_TABLE.exchange = (sym_A == TRUE) ? ENTRY_DB_GROUP.Exchange_A : ENTRY_DB_GROUP.Exchange_B
+				ENTRY_DB_NEW_ORDER_TABLE.currency = (sym_A == TRUE) ? ENTRY_DB_GROUP.Currency_A : ENTRY_DB_GROUP.Currency_B
+				ENTRY_DB_NEW_ORDER_TABLE.secType = (sym_A == TRUE) ? ENTRY_DB_GROUP.SecType_A : ENTRY_DB_GROUP.SecType_B
+				sharesholding = (sym_A == TRUE) ? ENTRY_DB_GROUP.Shares_Filled_A : ENTRY_DB_GROUP.Shares_Filled_B
+
+				if (pair_position_type == "CASH")
+					Position_HoldingType = "NONE"
+				else
+					Position_HoldingType = (sym_A == TRUE) ? ENTRY_DB_GROUP.Position_HoldingType_A : ENTRY_DB_GROUP.Position_HoldingType_B
+				endif
+
+				if (orderAction == "BUY") then
+
+					if (Position_HoldingType == "NONE" || Position_HoldingType == "LONG") then
+						if (Position_HoldingType == "NONE" AND ok_long == FALSE) then
+							LOG_MESSAGE(ENTRY_DB_NEW_ORDER_TABLE, "LongNotAllowed for " + symbol
+							DELETE(DB_NEW_ORDER_TABLE, ENTRY_DB_NEW_ORDER_TABLE)
+							continue
+						endif
+						if (NotTradeableEquity(Current_equity)) then
+							DELETE(DB_NEW_ORDER_TABLE, ENTRY_DB_NEW_ORDER_TABLE)
+							if (Position_HoldingType == "NONE") then
+								ENTRY_DB_GROUP.DONT_TRADE = TRUE
+								ENTRY_DB_GROUP.PAIR_POSITION_TYPE = "BUSTED"
+								LOG_MESSAGE(ENTRY_DB_GROUP, "Ran out of money")
+							else
+								LOG_MESSAGE(ENTRY_DB_GROUP, "Can not add long positions for " + symbol)
+							endif
+							continue
+						endif
+
+						ENTRY_DB_NEW_ORDER_TABLE.currentPrice = get_current_price(symbol)
+						sharestotrade = get_shares_quantity(symbol, leverage, Current_equity, ENTRY_DB_NEW_ORDER_TABLE.currentPrice)
+						retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "LONG")
+						if (retcode != SUCCESS) then
+							continue
+						endif
+						ThisOrderState = "OpenLong"
+
+					else if (Position_HoldingType == "SHORT") then
+						sharestotrade = sharesholding
+						retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "LONG")
+						if (retcode != SUCCESS) then
+							continue
+						endif
+						ThisOrderState = "CloseShort"
+					else
+						dump_table(DB_GROUP, "Inconsisten Position Type")
+						return DB_GROUP_INCONSISTENT_STATE
+					endif
+
+				else if (orderAction == "SELL") then
+
+					if (Position_HoldingType == "NONE" || Position_HoldingType == "SHORT") then
+						if (Position_HoldingType == "NONE" AND ok_short == FALSE) then
+							LOG_MESSAGE(ENTRY_DB_NEW_ORDER_TABLE, "ShortNotAllowed for " + symbol)
+							DELETE(DB_NEW_ORDER_TABLE, ENTRY_DB_NEW_ORDER_TABLE)
+							continue
+						endif
+						if (NotTradeableEquity(Current_equity)) then
+							DELETE(DB_NEW_ORDER_TABLE, ENTRY_DB_NEW_ORDER_TABLE)
+							if (Position_HoldingType == "NONE") then
+								ENTRY_DB_GROUP.DONT_TRADE = TRUE
+								ENTRY_DB_GROUP.PAIR_POSITION_TYPE = "BUSTED"
+								LOG_MESSAGE(ENTRY_DB_GROUP, "Ran out of money")
+							else
+								LOG_MESSAGE(ENTRY_DB_GROUP, "Can not add short positions for " + symbol)
+							endif
+							continue
+						endif
+
+						ENTRY_DB_NEW_ORDER_TABLE.currentPrice = get_current_price(symbol)
+						sharestotrade = get_shares_quantity(symbol, leverage, Current_equity, ENTRY_DB_NEW_ORDER_TABLE.currentPrice)
+						retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "SELL")
+						if (retcode != SUCCESS) then
+							continue
+						endif
+						ThisOrderState = "OpenShort"
+
+					else if (Position_HoldingType == "Long") then
+						sharestotrade = sharesholding
+						retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "SELL")
+						if (retcode != SUCCESS) then
+							continue
+						endif
+						ThisOrderState = "CloseLong"
+					else
+						dump_table(DB_GROUP, "Inconsisten Position Type")
+						return DB_GROUP_INCONSISTENT_STATE
+					endif
+					
+				else
+					dump_table(DB_NEW_ORDER_TABLE, "Inconsisten Order Action for symbol " + symbol)
+					return DB_NEW_ORDER_TABLE_INCONSISTENT_STATE
+				endif
+
+			else
+				# order to buy "A" whereas we have "B" 
+				# we need to liquidate "B" first and then wait for this order to be filled
+				if ((sym_A == TRUE && pair_position_type == 'B') OR
+				   (sym_B == TRUE && pair_position_type == 'A')) then
+					ENTRY_DB_NEW_ORDER_TABLE.orderstatus = 'OnHold'
+					new_symbol = (sym_A == TRUE) ? ENTRY_DB_GROUP.Symbol_B : ENTRY_DB_GROUP.Symbol_A
+					new_action = (sym_A == TRUE) ? get_flip_action(ENTRY_DB_GROUP.Position_HoldingType_B ): get_flip_action(ENTRY_DB_GROUP.Position_HoldingType_A)
+					new_ordertype = get_default_order_type()
+					new_currentprice = 0
+					new_orderstatus = 'Initialized'
+					SM3_ENTRY_DB_NEW_ORDER_TABLE = new DB_NEW_ORDER_TABLE()
+					SM3_ENTRY_DB_NEW_ORDER_TABLE.group_number = ENTRY_DB_GROUP.group_number
+					SM3_ENTRY_DB_NEW_ORDER_TABLE.symbol = new_symbol
+					SM3_ENTRY_DB_NEW_ORDER_TABLE.action = new_action
+					SM3_ENTRY_DB_NEW_ORDER_TABLE.orderType = new_ordertype
+					SM3_ENTRY_DB_NEW_ORDER_TABLE.signalPrice = get_current_price(new_symbol)
+					SM3_ENTRY_DB_NEW_ORDER_TABLE.signalTime = TIME()
+					SM3_ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Initialized"
+					SM3_ENTRY_DB_NEW_ORDER_TABLE.exchange = (sym_A == TRUE) ? ENTRY_DB_GROUP.Exchange_B : ENTRY_DB_GROUP.Exchange_A
+					SM3_ENTRY_DB_NEW_ORDER_TABLE.secType = (sym_A == TRUE) ? ENTRY_DB_GROUP.SecType_B : ENTRY_DB_GROUP.SecType_A
+					SM3_ENTRY_DB_NEW_ORDER_TABLE.currency = (sym_A == TRUE) ? ENTRY_DB_GROUP.Currency_B : ENTRY_DB_GROUP.Currency_A
+					SAVE(DB_NEW_ORDER_TABLE, SM3_ENTRY_DB_NEW_ORDER_TABLE)
+					ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "OnHold"
+					ENTRY_DB_GROUP.PendingHoldOrderNumber = SM3_ENTRY_DB_NEW_ORDER_TABLE.order_number 
+					ENTRY_DB_GROUP.PendingHoldOrderID = 0
+					ENTRY_DB_NEW_ORDER_TABLE.pending_hold_order_number = SM3_ENTRY_DB_NEW_ORDER_TABLE.order_number
+				endif
+			endif
+				
+		endif
+
+	end
+		
+
+Function FillDBGroupEntries(ENTRY_DB_GROUP, ENTRY_GET_ALL_EXECUTIONS)
+### fill the shares filled, prices etc etc
+## A or B
+# total etc etc
+
+
+Function CompleteExecutionDBGroup(ENTRY_GET_ALL_EXECUTIONS)
+	ENTRY_DB_GROUP = (DB_GROUP.group_number == ENTRY_GET_ALL_EXECUTIONS.group_number)
+	if ENTRY_DB_GROUP == NULL then
+		LogError("Group number not found " + group_number
+		return
+	endif
+	ENTRY_DB_GROUP.PendingHoldOrderID = ENTRY_GET_ALL_EXECUTIONS.orderid
+	if DB_NEW_ORDER_TABLE.pending_hold_order_number != 0 then
+		ENTRY_DB_NEW_ORDER_TABLE = DB_NEW_ORDER_TABLE.pending_hold_order_number == ENTRY_DB_GROUP.PendingHoldOrderNumber
+		if ENTRY_DB_NEW_ORDER_TABLE == NULL then
+			LogError("ENTRY_DB_NEW_ORDER_TABLE not found for pending_hold_order_number" + pending_hold_order_number)
+		return
+		ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Initialized"
+	endif
+	FillDBGroupEntries(ENTRY_DB_GROUP, ENTRY_GET_ALL_EXECUTIONS)
+
+
+Function get_flip_action(holdingtype):
+	if holdingtype == "LONG" then
+		return str_ORDER_TO_SELL
+	endif
+	if holdingtype == "SHORT" then
+		return str_ORDER_TO_BUY
+	endif
+Function get_default_order_type():
+	return str_MARKET_ORDER
+
+Function rounded_shares(sharesqty):
+	return int(sharesqty)
+
+Function get_current_price(symbol):
+	ENTRY_DB_CURRENT_QUOTE = DB_CURRENT_QUOTE.symbol == symbol
+	if (ENTRY_DB_CURRENT_QUOTE == NULL) then
+		dump_table(DB_CURRENT_QUOTE, "No quote found for " + symbol)
+		return 0
+	endif
+	return ENTRY_DB_CURRENT_QUOTE.last_price
+
+Function get_shares_quantity(symbol, leverage, equity, currPrice ):
+	if (currPrice == 0) then
+		currPrice = get_current_price(symbol)
+	endif
+	shares = rounded_shares((leverage * equity) / currPrice)
+	return shares
 
 Background:
 	Fill_DB_All_Open_Order

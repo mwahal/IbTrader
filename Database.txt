@@ -1,13 +1,13 @@
 
 DB_ACCOUNT_INFO
-	Account_Number VARCHAR(20) (INDEX)
-	Account_Broker VARCHAR(20)
-	Account_Name   VARCHAR(20)
+	Account_Number VARCHAR(20) (INDEX) PROTECTED
+	Account_Broker VARCHAR(20) PROTECTED
+	Account_Name   VARCHAR(20) PROTECTED
 	Account_Value DECIMAL(10,2)
-	GW_TCP_PORT_NUM INT
-	TWS_TCP_PORT_NUM INT
-	GW_TCP_IP_ADDR VARCHAR(20)
-	TWS_TCP_IP_ADDR VARCHAR(20)
+	GW_TCP_PORT_NUM INT PROTECTED
+	TWS_TCP_PORT_NUM INT PROTECTED
+	GW_TCP_IP_ADDR VARCHAR(20) PROTECTED
+	TWS_TCP_IP_ADDR VARCHAR(20) PROTECTED
 	TimeLastSynced DATETIME
 
 
@@ -15,7 +15,7 @@ DB_ORDERS_PLACED
 
    order_open_time DATETIME
    order_filled_time DATETIME
-   price_signal   DECIMAL(10,4)
+   signalPrice   DECIMAL(10,4)
 
    orderid   INT (INDEX)
    symbol   VARCHAR(20)
@@ -30,7 +30,11 @@ DB_ORDERS_PLACED
    account_number   VARCHAR(10)
    holding_type   VARCHAR(10) (LONG/SHORT)
    order_completed   BOOLEAN
+   order_partial_filled   BOOLEAN
+   commission DECIMAL(10,2)
+   totalvalue DECIMAL(10,2)
    avgprice   DECIMAL(10,4)
+   group_number INT
 
 
 DB_OUTSTANDING_ORDERS
@@ -84,6 +88,8 @@ DB_GET_ALL_EXECUTIONS
 	qty_filled   INT
 	numexec   INT
 	avgprice   DECIMAL(10,4)
+	total_value INT
+	commissions DECIMAL(10,2)
 	last_exectime   DATETIME
 
 #	24 EUR EUR.USD Submitted CASH BUY LMT 100000 1.01 USD IDEALPRO
@@ -99,3 +105,106 @@ DB_OPEN_ORDERS
 	limitprice DECIMAL(10,4)
     currency   VARCHAR(10)
     exchange   VARCHAR(10)
+
+
+# 25000 25000 UVXY XIV 0 0
+# 25000 0 UVXY XIV 1000 0
+# 25000 0 UVXY XIV 0 1000
+# 25000 12500 UVXY 500 0
+@Function : Update DB_GROUP as the orders execute, fill partial info (impt)
+DB_GROUP
+	AUTOINCR group_number
+	Initial_equity INT PROTECTED
+	Current_equity INT
+	IS_PAIR_TRADING BOOLEAN PROTECTED
+
+	DONT_TRADE BOOLEAN
+
+	PAIR_POSITION_TYPE CHAR(20) #  ( 'CASH', 'A', 'B', 'BUSTED')
+	LastOrderID INT
+	WaitingTobeFilled BOOLEAN
+	PendingHoldOrderNumber INT
+
+	NewOrderAction CHAR(10) # BUY/SELL
+	NewOrderType CHAR(10) # MKT/LMT
+	NewOrderState CHAR(10) # ('None', 'Initialized', 'OnHold', 'Placed', 'Submitted', 'Executed' , 'Canceled')
+
+
+	Symbol_A CHAR(20) PROTECTED
+	LongAllow_A BOOLEAN PROTECTED
+	ShortAllow_A BOOLEAN PROTECTED
+	Leverage_A DECIMAL(5,2) PROTECTED
+	Exchange_A CHAR(10) PROTECTED
+	Currency_A CHAR(10) PROTECTED
+	SecType_A CHAR(10) PROTECTED
+
+## valid only if IS_PAIR_TRADING is TRUE
+	Symbol_B CHAR(20) PROTECTED # 'NONE'
+	LongAllow_B BOOLEAN PROTECTED
+	ShortAllow_B BOOLEAN PROTECTED
+	Leverage_B DECIMAL(5,2) PROTECTED
+	Exchange_B CHAR(10) PROTECTED
+	Currency_B CHAR(10) PROTECTED
+	SecType_B CHAR(10) PROTECTED
+
+	Shares_Requested_A INT
+	Shares_Filled_A INT
+	Shares_Remaining_A INT
+	Position_HoldingType_A CHAR(20) # LastAction LONG/SHORT/NONE
+	Market_Value_A INT
+	Partial_Fill_A BOOLEAN
+
+
+## valid only if IS_PAIR_TRADING is TRUE
+	Shares_Requested_B INT
+	Shares_Filled_B INT
+	Shares_Remaining_B INT
+	Position_HoldingType_B CHAR(20) # LastAction LONG/SHORT/NONE
+	Market_Value_B INT
+	Partial_Fill_B BOOLEAN
+
+	Total_Shares_BUY_A INT
+	Total_Shares_SELL_A INT
+	Total_MarketValue_BUY_A INT
+	Total_MarketValue_SELL_A INT
+	Total_MarketValue_Traded_A INT
+	Total_Commission_A DECIMAL (10, 2)
+
+## valid only if IS_PAIR_TRADING is TRUE
+	Total_Shares_BUY_B INT
+	Total_Shares_SELL_B INT
+	Total_MarketValue_BUY_B INT
+	Total_MarketValue_SELL_B INT
+	Total_MarketValue_Traded_B INT
+	Total_Commission_B DECIMAL (10, 2)
+
+### @Function Read_NEW_ORDER_TABLE_and_Execute
+DB_NEW_ORDER_TABLE
+
+	AUTOINCR order_number INDEX
+	orderid INT
+	symbol CHAR(20)
+	pairsymbol CHAR(20) # default 'NONE'
+	action CHAR(10) # BUY/SELL
+	orderType CHAR(10) # MKT/LMT
+	signalPrice DECIMAL(10,4)
+	currentPrice DECIMAL(10,4)
+	limitPrice DECIMAL(10,4)
+
+	group_number INT
+	pending_hold_order_number INT
+	sharestotrade INT
+	orderstatus CHAR(20) #  ('None', 'Initialized', 'OnHold', 'Placed', 'Submitted', 'Executed' , 'Canceled')
+	exchange CHAR(10) PROTECTED
+	currency CHAR(10) PROTECTED
+	secType CHAR(10) PROTECTED
+	signalTime DATETIME
+
+
+DB_CURRENT_QUOTE
+	symbol CHAR(20)
+	last_price DECIMAL(10,4)
+	last_time DATETIME
+	volume INT
+
+#CONCEPT PROTECTED : grant *.* user(master), grant !PROTECTED user(stocktrader), connect to mysql as user(stocktrader)
