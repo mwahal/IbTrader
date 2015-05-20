@@ -17,7 +17,7 @@ DB_ORDERS_PLACED
    order_filled_time DATETIME
    signalPrice   DECIMAL(10,4)
 
-   orderid   INT (INDEX)
+   IB_orderid   INT (INDEX)
    symbol   VARCHAR(20)
    sectype   VARCHAR(10)
    currency   VARCHAR(10)
@@ -35,15 +35,18 @@ DB_ORDERS_PLACED
    totalvalue DECIMAL(10,2)
    avgprice   DECIMAL(10,4)
    group_number INT
+   order_number INT
 
 
 DB_OUTSTANDING_ORDERS
    symbol   VARCHAR(20)
-   orderid   INT (INDEX)
+   IB_orderid   INT (INDEX)
    is_order_open   BOOLEAN
    is_order_canceled   BOOLEAN
    order_open_time   DATETIME
    order_filled_time   DATETIME
+   group_number INT
+   order_number INT
 			
 
 DB_LOCAL_PORTFOLIO
@@ -66,7 +69,7 @@ DB_BROKER_PORTFOLIO
 DB_BROKER_EXEC_REPORT
 
 #EUR {'orderid': '1', 'account': 'DU226708', 'execprice': 1.11865, 'exchange': 'IDEALPRO', 'symbol': 'EUR', 'permid': 2137440949, 'execid': '0001f4e8.55493475.01.01', 'clientid': '8899', 'qty': 1000000, 'avgprice': 1.11865, 'execshares': 1000000, 'expiry': '', 'side': 'SLD', 'times': '20150505  15:01:53'}
-	orderid   INT
+	IB_orderid   INT
 	symbol   VARCHAR(20)
 	account_number   VARCHAR(10)
 	execprice   DECIMAL(10,4)
@@ -82,7 +85,7 @@ DB_BROKER_EXEC_REPORT
 	exectime   DATETIME (INDEX)
 
 DB_GET_ALL_EXECUTIONS
-	orderid   INT (INDEX)
+	IB_orderid   INT (INDEX)
 	symbol   VARCHAR(20)
 	side   VARCHAR(10)
 	qty_filled   INT
@@ -91,10 +94,12 @@ DB_GET_ALL_EXECUTIONS
 	total_value INT
 	commissions DECIMAL(10,2)
 	last_exectime   DATETIME
+    group_number INT
+    order_number INT
 
 #	24 EUR EUR.USD Submitted CASH BUY LMT 100000 1.01 USD IDEALPRO
 DB_OPEN_ORDERS
-	orderid   INT (INDEX)
+	IB_orderid   INT (INDEX)
 	symbol   VARCHAR(20)
     complete_symbol_type   VARCHAR(32) (INDEX)
 	status VARCHAR(20)
@@ -121,9 +126,11 @@ DB_GROUP
 	DONT_TRADE BOOLEAN
 
 	PAIR_POSITION_TYPE CHAR(20) #  ( 'CASH', 'A', 'B', 'BUSTED')
-	LastOrderID INT
+	LastIBOrderID INT
 	WaitingTobeFilled BOOLEAN
 	PendingHoldOrderNumber INT
+	PendingHoldIBOrderID INT
+	CurrentOrderNumber INT
 
 	NewOrderAction CHAR(10) # BUY/SELL
 	NewOrderType CHAR(10) # MKT/LMT
@@ -182,7 +189,7 @@ DB_GROUP
 DB_NEW_ORDER_TABLE
 
 	AUTOINCR order_number INDEX
-	orderid INT
+	IB_orderid INT
 	symbol CHAR(20)
 	pairsymbol CHAR(20) # default 'NONE'
 	action CHAR(10) # BUY/SELL
