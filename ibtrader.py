@@ -7,6 +7,8 @@ https://pypi.python.org/pypi/swigibpy/0.4.1
 import sys
 import argparse
 import time
+import json
+from pprint import pprint
 from threading import Event
 
 from swigibpy import (EWrapper, EPosixClientSocket, Contract, Order, TagValue,
@@ -23,6 +25,23 @@ except:
     from queue import Queue
 
 ###
+    
+
+def print_json_start(mapkeyword):
+    print "{ \"%s\" : ["  % (mapkeyword)
+
+def print_json_dictword(dictline):
+    print "%s, " % json.dumps(dictline)
+
+def print_json_end():
+    print "{\"dummy\" : 0} ] }"
+
+def print_dictonary_json(mapkeyword, dictword):
+    
+    print_json_start(mapkeyword)
+    for key in mapkeyword:
+        print_json_dictword(key)
+    print_json_end()
 
 def get_order_exchange(symbol, secType, currency):
     
@@ -45,7 +64,7 @@ def get_open_orders():
     iserror=False
     request_finished=False
     is_request_open_order=True
-    order_structure={}
+    order_structure=[]
     
     start_time=time.time()
     tws.reqAllOpenOrders()
@@ -87,7 +106,7 @@ def get_IB_positions():
     request_finished=False
     iserror=False
     portfolio_structure=[]
-    portfolio_holdings = {}
+    portfolio_holdings = []
     account_value=[]
     accountid = "DU999999"
 
@@ -102,7 +121,7 @@ def get_IB_positions():
             iserror=True
         pass
     if debug:
-        print "reqAccountUpdates(False, self.accountid)"
+        print "reqAccountUpdates(False, self.accountid) iserror = ", iserror
     tws.reqAccountUpdates(False, accountid)
 
     exchange_rates={}
@@ -155,6 +174,8 @@ def place_order(symbol, secType, exchange, primaryExchange, currency, action, lm
     order.action = action
     order.lmtPrice = lmtPrice
     order.orderType = orderType
+#    order.overridePercentageConstraints = overridePercentageConstraints
+    #order.orderRef = tws_clientid
     order.totalQuantity = totalQuantity
 
 
@@ -251,6 +272,10 @@ def get_executions():
 	if iserror:
 		raise Exception("Problem getting executions")
 
+        for key in execlist:
+            execid = key["execid"]
+            key["commission"] = mycommdetails[execid]
+
 	return execlist
 
 class IBClient(EWrapper):
@@ -287,15 +312,22 @@ class IBClient(EWrapper):
             curr_action = "SELL"
             flip_action = "BUY"
 
-        portdict=dict(contract=contract, symbol=sym , this_symbol=contract.symbol, expiry=contract.expiry, 
+        costPrice = averageCost * position
+        gnloss = marketValue - costPrice
+        if position > 0:
+            hold_type = "LONG"
+        else:
+            hold_type = "SHORT"
+        portdict=dict(localSymbol=contract.localSymbol,symbol=contract.symbol, expiry=contract.expiry, 
                        secType=contract.secType, currency=contract.currency,
                        exchange=contract.exchange,quantity=position,
                        primaryExchange = contract.primaryExchange,
                        marketPrice=marketPrice, marketValue= marketValue, averageCost=averageCost,
-                       curr_action=curr_action, flip_action=flip_action,
-                       unrealizedPNL=unrealizedPNL, realizedPNL=realizedPNL, accountName=accountName) 
+                       curr_action=curr_action, flip_action=flip_action,hold_type=hold_type,
+                       unrealizedPNL=unrealizedPNL, realizedPNL=realizedPNL, accountName=accountName, costPrice=costPrice, gainloss=gnloss) 
 
-        portfolio_holdings[sym] = portdict
+        #portfolio_holdings[sym] = portdict
+        portfolio_holdings.append(portdict)
         #portfolio_holdings[sym] = (contract.symbol, contract.expiry, position, marketPrice, marketValue, averageCost, unrealizedPNL, realizedPNL, accountName, contract.currency)
         portfolio_structure.append((sym, contract.expiry, position, marketPrice, marketValue, averageCost, 
                                     unrealizedPNL, realizedPNL, accountName, contract.currency, contract.exchange, contract.primaryExchange))
@@ -347,7 +379,7 @@ class IBClient(EWrapper):
         if debug:
            print "updateAccountValue portfolio_finished = %d key = %s value = %s currency = %s accountName = %s" % (request_finished, key, value, currency, accountName)
         if key == "AccountCode":
-            account_number = value
+            accountName = value
         account_value.append((key, value, currency, accountName))
         
 
@@ -409,8 +441,10 @@ class IBClient(EWrapper):
         symbol=contract.symbol
         expiry=contract.expiry
         side=execution.side
+        localsymbol=contract.localSymbol.replace(' ', '')
 
-        execdetails=dict(side=str(side), times=str(exectime), orderid=str(thisorderid), execshares=int(execution.shares), qty=int(cumQty), avgprice=float(execution.avgPrice), execprice=float(execution.price), symbol=str(symbol), expiry=str(expiry), clientid=str(clientid), execid=str(execid), account=str(account_number), exchange=str(exchange), permid=int(permid))
+        #execdetails=dict(side=str(side), exectime=str(exectime), orderid=str(thisorderid), execshares=int(execution.shares), qty=int(cumQty), avgprice=float(execution.avgPrice), execprice=float(execution.price), symbol=str(symbol), expiry=str(expiry), clientid=str(clientid), execid=str(execid), account=str(account_number), exchange=str(exchange), permid=int(permid), commission=0)
+        execdetails=dict(side=str(side), exectime=str(exectime), orderid=int(thisorderid), execshares=int(execution.shares), qty=int(cumQty), avgprice=float(execution.avgPrice), execprice=float(execution.price), symbol=str(symbol), expiry=str(expiry), clientid=int(clientid), execid=str(execid), accountName=str(account_number), exchange=str(exchange), permid=int(permid), commission=str(0), localsymbol=localsymbol, secType=contract.secType, primaryExchange=contract.primaryExchange)
 
         if debug:
 #           print "execDetails id = %s contract = %s execution = %s" % (id, str(contract), str(execution))
@@ -448,6 +482,9 @@ class IBClient(EWrapper):
               all_trades_filled = 1
               avg_price_per_share = execution.avgPrice
               total_shares_filled = execution.cumQty
+              total_commission_paid = 0
+              for key in myexecdetails.items():
+                  total_commission_paid += mycommdetails[key]
               if debug:
                  print "AvgPrice = %.4f TotalFilled = %d TotalComm = %.2f" % (execution.avgPrice, execution.cumQty, total_comm)
               if (all_comm_filled == 1):
@@ -508,12 +545,12 @@ class IBClient(EWrapper):
            localSymbol = contract.localSymbol
            
 
-        orderdict=dict(contract=contract, symbol=contract.symbol , localSymbol = localSymbol, orderState_status = orderState.status, expiry=contract.expiry, 
+        orderdict=dict(accountName=order.account,symbol=contract.symbol , localSymbol = localSymbol, orderState_status = orderState.status, expiry=contract.expiry, 
                        qty=int(order.totalQuantity) ,  limitPrice = order.lmtPrice ,
                        side=order.action , orderid=orderID, clientid=order.clientId , secType=contract.secType, currency=contract.currency,
                        exchange=contract.exchange, primaryExchange=contract.primaryExchange, quantity=order.totalQuantity, orderType=order.orderType, action=order.action) 
         
-        order_structure[orderID] = orderdict
+        order_structure.append(orderdict)
 
 
 
@@ -549,12 +586,13 @@ iserror = False
 request_finished=False
 execlist = []
 getting_today_executions = False
-account_number = "NO_ACCOUNT_NUM"
+accountName = "NO_ACCOUNT_NUM"
 partial_avg_price_per_share = 0
 partial_shares_filled = 0
 avg_price_per_share = 0
 total_shares_filled = 0
 is_request_open_order = False
+overridePercentageConstraints = True
 
 mycommdetails = {}
 myexecdetails = {}
@@ -570,7 +608,7 @@ tws_host = ""
 tws_clientid = 8899
 WAIT_TIME = 300
 MAX_WAIT_SECONDS = 30
-order_structure = {}
+order_structure = []
 MEANINGLESS_NUMBER=1729
 is_placing_order = False
 errormsg = ""
@@ -604,8 +642,8 @@ parser.add_argument('-pf', '--print_portfolio', action='store_true', help="Print
 parser.add_argument('-pp', '--print_positions', action='store_true', help="Print ALL Positions")
 parser.add_argument('-ps', '--print_sym_position', action='store_true', help="Print Position for Symbol")
 parser.add_argument('-pe', '--print_executions', action='store_true', help="Print Executions")
-parser.add_argument('-pid', '--print_order_id', action='store_true', help="Print Executions By Order ID")
 parser.add_argument('-pse', '--print_sym_executions', action='store_true', help="Print Executions for Symbol")
+parser.add_argument('-pid', '--print_order_id', action='store_true', help="Print Executions By Order ID")
 parser.add_argument('-po', '--print_open_orders', action='store_true', help="Print Open Orders")
 parser.add_argument('-d', '--debug', action='store_true', help="Debug enable")
 parser.add_argument('-nod', '--no-debug', action='store_false', help="Debug disable")
@@ -694,7 +732,7 @@ if args.tws_clientid != 'not_a_tws_clientid':
    tws_clientid = int(args.tws_clientid)
 
 if debug:
-   print 'tws_clientid is %d ', tws_clientid
+   print 'tws_clientid is  ', tws_clientid
 
 
 
@@ -798,11 +836,14 @@ if args.print_executions or args.print_sym_executions or args.print_order_id:
       sys.exit()
 
    myexecutions = get_executions()
+
+   print_json_start("AllTrades")
    for key in myexecutions:
        sym = key["symbol"]
        oid = key["orderid"]
        if args.print_executions or (args.print_sym_executions and sym == args.symbol) or (args.print_order_id and args.order_id == oid):
-           print sym,  key
+           print_json_dictword(key)
+   print_json_end()
 
 if args.print_portfolio or args.print_positions or args.print_sym_position:
     myport = get_IB_positions()
@@ -823,43 +864,34 @@ if args.print_portfolio or args.print_positions or args.print_sym_position:
 
     if debug:
         print "Portfolio Holdings"
-    for key, val in  port_holdings.items():
+    print_json_start("PortfolioHoldings")
+    for key in  port_holdings:
         if debug:
-           print "Port_Holdings %s = %s" % (key, val)
-        sym = val["symbol"]
-        qty = val["quantity"]
+           print "Port_Holdings %s" % (key)
+        qty = key["quantity"]
+        sym = key["localSymbol"]
         if qty != 0 and (args.print_positions or (args.print_sym_position and sym == args.symbol)):
-            this_symbol = val["this_symbol"]
-            marketValue = val["marketValue"]
-            marketPrice = val["marketPrice"]
-            averageCost = val["averageCost"]
-            accountName = val["accountName"]
-            costPrice = averageCost * qty
-            secType = val["secType"]
-            gnloss = marketValue - costPrice
-            if qty > 0:
-                hold_type = "LONG"
-            else:
-                hold_type = "SHORT"
-            print this_symbol, sym, hold_type, qty, marketValue, costPrice, gnloss, marketPrice, averageCost, secType, accountName
+            print_json_dictword(key)
+    print_json_end()
 
 
 if args.close_all_positions or args.close_sym_position:
     myport = get_IB_positions()
     all_positions = myport[2]
     args.no_wait_for_complete = 1
-    for key, val in  all_positions.items():
-        order_symbol = val["this_symbol"]
-        order_quantity = val["quantity"]
+    for key in  all_positions:
+        order_localSymbol = key["localSymbol"]
+        order_quantity = key["quantity"]
         if order_quantity < 0:
             order_quantity = -order_quantity
-        if order_quantity > 0 and (args.close_all_positions or (args.close_sym_position and args.symbol == order_symbol)):
+        if order_quantity > 0 and (args.close_all_positions or (args.close_sym_position and args.symbol == order_localSymbol)):
             if debug:
-                print "Portfolio %s %s", key, val
-            order_secType = val["secType"]
-            order_exchange = val["exchange"]
-            order_currency = val["currency"]
-            order_action = val["flip_action"]
+                print "Portfolio %s ", key
+            order_symbol = key["symbol"]
+            order_secType = key["secType"]
+            order_exchange = key["exchange"]
+            order_currency = key["currency"]
+            order_action = key["flip_action"]
             order_type = "MKT"
             if debug:
                print "Close order_symbol = %s %s %s %d @ %s order_exchange = %s" % (order_symbol, key, order_action, order_quantity, order_type, order_exchange)
@@ -867,27 +899,35 @@ if args.close_all_positions or args.close_sym_position:
             if order_exchange == '':
                order_exchange = get_order_exchange(order_symbol, order_secType, order_currency)
             order_primaryexchange = order_exchange
-            place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, account_number)
+            place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, accountName)
 #24 {'orderid': 24L, 'exchange': 'IDEALPRO', 'secType': 'CASH', 'orderType': 'LMT', 'primaryExchange': '', 'clientid': 8899L, 'qty': 100000, 'currency': 'USD', 'contract': <swigibpy.Contract; proxy of <Swig Object of type 'Contract *' at 0x7fb0883a2480> >, 'action': 'BUY', 'expiry': '', 'symbol': 'EUR', 'quantity': 100000L, 'side': 'BUY'}
 if args.print_open_orders or args.cancel_all_orders or args.cancel_sym_order:
     openorders = get_open_orders()
     if debug:
         print "Active orders: (should just be limit order)"
-    for key, val in openorders.items():
-#        print key, val
-        sym = val["symbol"]
-        contract = val["contract"]
-        orderid = key
-        print "%d %s %s %s %s %s %s %s %s %s %s " % (key, sym, val["localSymbol"], val["orderState_status"], val["secType"], val["action"], val["orderType"], val["qty"], val["limitPrice"], val["currency"], val["exchange"])
+    if args.print_open_orders:
+       print_json_start("OpenOrders")
+    if args.cancel_all_orders or args.cancel_sym_order:
+       print_json_start("CancelOrders")
+    for key in openorders:
+        localSymbol = key["localSymbol"]
+        orderid = key["orderid"]
+        print_json_dictword(key)
+        #if args.print_open_orders:
+#        print "%d %s %s %s %s %s %s %s %s %s %s " % (key, sym, val["localSymbol"], val["orderState_status"], val["secType"], val["action"], val["orderType"], val["qty"], val["limitPrice"], val["currency"], val["exchange"])
         
-        if args.cancel_all_orders or (args.cancel_sym_order and args.symbol == sym):
+        if args.cancel_all_orders or (args.cancel_sym_order and args.symbol == localSymbol):
             if debug:
                 print "Cancel order id %d symbol = %s" %  (key, sym)
-            tws.cancelOrder(key)
+            tws.cancelOrder(orderid)
+
     if args.cancel_all_orders:
-        print "Waiting for cancellation to finish"
+        if debug:
+           print "Waiting for cancellation to finish"
         while any_open_orders():
           pass
-        print "All orders canceled"
+        if debug:
+           print "All orders canceled"
+    print_json_end()
 
 tws.eDisconnect()
