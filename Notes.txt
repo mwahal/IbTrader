@@ -1,9 +1,65 @@
 
+### todo 
+# tie up everything - based on the order_number
+# order placed, order filled, db_group, new_order_table
 
 Each account - 
 	a unique clientid to connect to TWS
 	a unique instance of GW running with a unique TCP port
 	a unique account number to be passed
+
+
+ENTRY Function CloseSymPosition(symbol)
+		ENTRY_DB_BROKER_PORTFOLIO = DB_BROKER_PORTFOLIO.symbol == symbol
+		if ENTRY_DB_BROKER_PORTFOLIO == NULL then
+			LogError("CloseSymPosition symbol not found " + symbol)
+			return
+		endif
+		order_type = get_flip_action(ENTRY_DB_BROKER_PORTFOLIO.holding_type)
+		ENTRY_DB_NEW_ORDER_TABLE = new DB_NEW_ORDER_TABLE(generate_unique_randomid())
+		ENTRY_DB_NEW_ORDER_TABLE.symbol = symbol
+		ENTRY_DB_NEW_ORDER_TABLE.order_type = order_type
+		ENTRY_DB_NEW_ORDER_TABLE.order_status = "Initialized"
+		SAVE(DB_NEW_ORDER_TABLE, ENTRY_DB_NEW_ORDER_TABLE)
+
+ENTRY Function CloseAllPositions()
+	for ENTRY_DB_BROKER_PORTFOLIO in DB_BROKER_PORTFOLIO
+		symbol = ENTRY_DB_BROKER_PORTFOLIO.symbol
+		CloseSymPosition(symbol)
+	endfor
+
+PERIODIC Function SyncDBGroupWithPortfolio()
+	num_symbols = 0
+	for ENTRY_DB_BROKER_PORTFOLIO in DB_BROKER_PORTFOLIO
+		symbol = ENTRY_DB_BROKER_PORTFOLIO.symbol
+		num_symbols++
+		all_portfolio_symbols[symbol] = 1
+		ENTRY_DB_GROUP = DB_GROUP.Symbol_A == symbol || DB_GROUP.Symbol_B == symbol
+		if (ENTRY_DB_GROUP == NULL) then
+			LogError("DB_GROUP no entry for " symbol)
+			continue
+		endif
+	endfor
+
+	for ENTRY_DB_GROUP in DB_GROUP
+		sym_A = ENTRY_DB_GROUP.Symbol_A
+		sym_B = ENTRY_DB_GROUP.Symbol_B
+		if sym_A != "NONE" then
+			group_symbols[sym_A] = 1
+			if sym_A not in all_portfolio_symbols then
+				LogError("Symbol found in DB_GROUP but not in portfolio" + sym_A)
+				FixDBGroupEntry(ENTRY_DB_GROUP, sym_A)
+			endif
+		endif
+		if sym_B != "NONE" then
+			group_symbols[sym_B] = 1
+			if sym_B not in all_portfolio_symbols then
+				LogError("Symbol found in DB_GROUP but not in portfolio" + sym_B)
+				FixDBGroupEntry(ENTRY_DB_GROUP, sym_B)
+			endif
+		endif
+	endfor
+		
 
 
 ENTRY Function CancelAllOpenOrder()
@@ -22,13 +78,17 @@ ENTRY Function CancelSymOpenOrder(symbol)
 	endif
 	ENTER_DB_OPEN_ORDERS = (DB_OPEN_ORDERS.localsymbol == symbol)
 	if ENTER_DB_OPEN_ORDERS.localsymbol NOT NULL then
-		Cancel_Order_Update_DB(symbol)
+		Cancel_Sym_Order_Update_DB(symbol)
 	endif
 
 Function Cancel_Sym_Order_Update_DB(symbol)
 	ENTRY_OUTSTANDING_ORDERS = (DB_OUTSTANDING_ORDERS.symbol == symbol)
 	if ENTRY_OUTSTANDING_ORDERS is not NULL then
 		ENTRY_OUTSTANDING_ORDERS.is_order_canceled = TRUE
+		ENTRY_DB_NEW_ORDER_TABLE = DB_NEW_ORDER_TABLE.IB_orderid == DB_OUTSTANDING_ORDERS.IB_orderid
+		if ENTRY_DB_NEW_ORDER_TABLE != NULL then
+			ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Canceled"
+		endif
 		PYTHON_cancel_open_order_symbol(symbol)
 		if FAILURE then
 			LogError(symbol, "OrderCancel")
@@ -80,6 +140,7 @@ Function PlaceOrder(ENTRY_DB_NEW_ORDER_TABLE)
 	order_type = ENTRY_DB_NEW_ORDER_TABLE.orderType
 	limitprice = ENTRY_DB_NEW_ORDER_TABLE.limitPrice
 	group_number = ENTRY_DB_NEW_ORDER_TABLE.group_number
+	order_number = ENTRY_DB_NEW_ORDER_TABLE.order_number
 	order_time = TIME()
 
 	json = PYTHON_place_asynchronous_order(symbol, signalPrice, secType, currency, qty, action, order_type, limitprice, exchange, order_time)
@@ -93,9 +154,9 @@ Function PlaceOrder(ENTRY_DB_NEW_ORDER_TABLE)
 	if FAIL then
 		return -1
 	endif
-	orderid = get_order_id(json)
+	IB_orderid = get_order_id(json)
 	ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Placed"
-	ENTRY_DB_NEW_ORDER_TABLE.orderid = orderid
+	ENTRY_DB_NEW_ORDER_TABLE.IB_orderid = IB_orderid
 	Update_DB_GROUP(ENTRY_DB_NEW_ORDER_TABLE.group_number, "Placed")
 
 	Store it in the database with timestamp
@@ -105,8 +166,9 @@ Function PlaceOrder(ENTRY_DB_NEW_ORDER_TABLE)
 		   ENTRY_ORDERS_PLACED.order_open_time = order_time
 		   ENTRY_ORDERS_PLACED.signalPrice = signalPrice
 
-		   ENTRY_ORDERS_PLACED.orderid = orderid
+		   ENTRY_ORDERS_PLACED.IB_orderid = IB_orderid
 		   ENTRY_ORDERS_PLACED.group_number = group_number
+		   ENTRY_ORDERS_PLACED.order_number = order_num
 		   ENTRY_ORDERS_PLACED.symbol = symbol
 		   ENTRY_ORDERS_PLACED.sectype = sectype
 		   ENTRY_ORDERS_PLACED.currency = currency
@@ -128,10 +190,12 @@ Function PlaceOrder(ENTRY_DB_NEW_ORDER_TABLE)
 			ENTRY_OUTSTANDING_ORDERS.is_order_open = TRUE
 			ENTRY_OUTSTANDING_ORDERS.is_order_canceled = FALSE
 			ENTRY_OUTSTANDING_ORDERS.order_open_time = time()
-			ENTRY_OUTSTANDING_ORDERS.orderid = orderid
+			ENTRY_OUTSTANDING_ORDERS.IB_orderid = IB_orderid
+			ENTRY_OUTSTANDING_ORDERS.group_number = group_number
+			ENTRY_OUTSTANDING_ORDERS.order_number = order_number
 			SAVE(DB_OUTSTANDING_ORDERS, ENTRY_OUTSTANDING_ORDERS)
 
-		return orderid
+		return IB_orderid
 
 Function Fill_DB_All_Open_Order:
 	 ### all open orders report from Broker
@@ -140,16 +204,16 @@ Function Fill_DB_All_Open_Order:
 		Update_Error_Table(FAILURE_CODE)
 		return FALSE
 	endif
-	all_orderids[] = 0
+	all_IB_orderids[] = 0
 	for oo in openorder_array[]
-		orderid = oo[orderid]
-		all_orderids[orderid]++
+		IB_orderid = oo[IB_orderid]
+		all_IB_orderids[IB_orderid]++
 		SAVE(DB_OPEN_ORDERS, oo)
 	endfor
 # remove old open entries which are expired now
 	for ENTRY_OPEN_ORDERS in DB_OPEN_ORDERS
-		oid = ENTRY.orderid
-		if all_orderids[orderid] == 0 then
+		oid = ENTRY_OPEN_ORDERS.IB_orderid
+		if all_IB_orderids[IB_orderid] == 0 then
 			DELETE(DB_OPEN_ORDERS, ENTRY_OPEN_ORDERS)
 		endif
 	endfor
@@ -164,7 +228,7 @@ Function Fill_DB_All_Execution_Table:
 	exec_array[] ### all execution reports from Broker 
 	entries[] = 0
 	for exec in exec_array[]
-		oid = exec[orderid]
+		oid = exec[IB_orderid]
 		entries[oid]++
 		SAVE(DB_BROKER_EXEC_REPORT, exec)
 	endfor
@@ -174,11 +238,13 @@ Function Fill_DB_All_Execution_Table:
 		last_exectime = 0
 		numexec = 0
 		total_value = 0
-		for exec in (DB_BROKER_EXEC_REPORT.orderid == oid)
+		commissions = 0
+		for exec in (DB_BROKER_EXEC_REPORT.IB_orderid == oid)
 			symbol = exec.symbol
 			side = exec.side
 			execshares = exec.execshares
 			execprice = exec.execprice
+			commissions += exec.commissions
 			total_value += (execshares*execprice)
 			avgprice = exec.avgprice
 			qty_filled = MAX(exec.qty_filled, qty_filled)
@@ -186,7 +252,7 @@ Function Fill_DB_All_Execution_Table:
 			numexec++
 		endfor
 		ENTRY_GET_ALL_EXECUTIONS = new Row(DB_GET_ALL_EXECUTIONS)
-		ENTRY_GET_ALL_EXECUTIONS.orderid = oid
+		ENTRY_GET_ALL_EXECUTIONS.IB_orderid = oid
 		ENTRY_GET_ALL_EXECUTIONS.symbol = symbol
 		ENTRY_GET_ALL_EXECUTIONS.side = side
 		ENTRY_GET_ALL_EXECUTIONS.qty_filled = qty_filled
@@ -194,8 +260,18 @@ Function Fill_DB_All_Execution_Table:
 		ENTRY_GET_ALL_EXECUTIONS.avgprice = avgprice
 		ENTRY_GET_ALL_EXECUTIONS.total_value = total_value
 		ENTRY_GET_ALL_EXECUTIONS.last_exectime = last_exectime
-		ENTRY_GET_ALL_EXECUTIONS.commissions = Get_Commission_Report(oid)
+		ENTRY_GET_ALL_EXECUTIONS.commissions = commissions
+
+		ENTRY_DB_OUTSTANDING_ORDERS = (DB_OUTSTANDING_ORDERS.IB_orderid == oid)
+		if ENTRY_DB_OUTSTANDING_ORDERS != NULL then
+			ENTRY_GET_ALL_EXECUTIONS.group_number = ENTRY_DB_OUTSTANDING_ORDERS.group_number
+			ENTRY_GET_ALL_EXECUTIONS.order_number = ENTRY_DB_OUTSTANDING_ORDERS.order_number
+		else
+			ENTRY_GET_ALL_EXECUTIONS.group_number = 0
+			ENTRY_GET_ALL_EXECUTIONS.order_number = 0
+		endif
 		SAVE(DB_GET_ALL_EXECUTIONS, ENTRY_GET_ALL_EXECUTIONS)
+
 	endfor
 
 
@@ -210,10 +286,10 @@ Function Fill_DB_Execution:
 	endif
 	for ENTRY_OUTSTANDING_ORDERS in the table DB_OUTSTANDING_ORDERS
 		if ENTRY_OUTSTANDING_ORDERS.is_order_open == TRUE OR  ENTRY_OUTSTANDING_ORDERS.is_order_canceled == TRUE
-			ENTRY_ORDERS_PLACED = (DB_ORDERS_PLACED.orderid == ENTRY_OUTSTANDING_ORDERS.orderid)
-			orderid = ENTRY_ORDERS_PLACED.orderid
+			ENTRY_ORDERS_PLACED = (DB_ORDERS_PLACED.IB_orderid == ENTRY_OUTSTANDING_ORDERS.IB_orderid)
+			IB_orderid = ENTRY_ORDERS_PLACED.IB_orderid
 			qty_requested = ENTRY_ORDERS_PLACED.qty_requested
-			ENTRY_GET_ALL_EXECUTIONS = (DB_GET_ALL_EXECUTIONS.orderid == orderid)
+			ENTRY_GET_ALL_EXECUTIONS = (DB_GET_ALL_EXECUTIONS.IB_orderid == IB_orderid)
 			qty_filled = ENTRY_GET_ALL_EXECUTIONS.qty_filled
 # handle partial execytion here
 # fill DB_GROUP
@@ -294,17 +370,15 @@ Function CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, Lo
 
 
 	if (ENTRY_DB_GROUP.PendingHoldOrderNumber == ENTRY_DB_NEW_ORDER_TABLE.order_number) then
-		ENTRY_DB_GROUP.PendingHoldOrderID = oid
+		ENTRY_DB_GROUP.PendingHoldIBOrderID = oid
 	endif
-	ENTRY_DB_GROUP.LastOrderID = oid
+	ENTRY_DB_GROUP.LastIBOrderID = oid
 	ENTRY_DB_GROUP.WaitingTobeFilled = TRUE
+	ENTRY_DB_GROUP.CurrentOrderNumber = ENTRY_DB_NEW_ORDER_TABLE.order_number
 	return SUCCESS
 
-Function Read_DB_NEW_ORDER_TABLE:
+PERIODIC Function Read_DB_NEW_ORDER_TABLE:
 	for ENTRY_DB_NEW_ORDER_TABLE in DB_NEW_ORDER_TABLE
-		if ENTRY_DB_NEW_ORDER_TABLE.orderstatus == 'OnHold' then
-		   continue # the for loop
-		endif
 		if ENTRY_DB_NEW_ORDER_TABLE.orderstatus != 'Initialized' then
 		   continue # the for loop
 		endif
@@ -368,7 +442,7 @@ Function Read_DB_NEW_ORDER_TABLE:
 							continue
 						endif
 						if (NotTradeableEquity(Current_equity)) then
-							DELETE(DB_NEW_ORDER_TABLE, ENTRY_DB_NEW_ORDER_TABLE)
+							ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Invalid"
 							if (Position_HoldingType == "NONE") then
 								ENTRY_DB_GROUP.DONT_TRADE = TRUE
 								ENTRY_DB_GROUP.PAIR_POSITION_TYPE = "BUSTED"
@@ -416,7 +490,7 @@ Function Read_DB_NEW_ORDER_TABLE:
 							continue
 						endif
 						if (NotTradeableEquity(Current_equity)) then
-							DELETE(DB_NEW_ORDER_TABLE, ENTRY_DB_NEW_ORDER_TABLE)
+							ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Invalid"
 							if (Position_HoldingType == "NONE") then
 								ENTRY_DB_GROUP.DONT_TRADE = TRUE
 								ENTRY_DB_GROUP.PAIR_POSITION_TYPE = "BUSTED"
@@ -465,13 +539,11 @@ Function Read_DB_NEW_ORDER_TABLE:
 				# we need to liquidate "B" first and then wait for this order to be filled
 				if ((sym_A == TRUE && pair_position_type == 'B') OR
 				   (sym_B == TRUE && pair_position_type == 'A')) then
-					ENTRY_DB_NEW_ORDER_TABLE.orderstatus = 'OnHold'
 					new_symbol = (sym_A == TRUE) ? ENTRY_DB_GROUP.Symbol_B : ENTRY_DB_GROUP.Symbol_A
 					new_action = (sym_A == TRUE) ? get_flip_action(ENTRY_DB_GROUP.Position_HoldingType_B ): get_flip_action(ENTRY_DB_GROUP.Position_HoldingType_A)
 					new_ordertype = get_default_order_type()
-					new_currentprice = 0
-					new_orderstatus = 'Initialized'
-					SM3_ENTRY_DB_NEW_ORDER_TABLE = new DB_NEW_ORDER_TABLE()
+					auto_generated_randomID =  generate_unique_randomid()
+					SM3_ENTRY_DB_NEW_ORDER_TABLE = new DB_NEW_ORDER_TABLE(auto_generated_randomID)
 					SM3_ENTRY_DB_NEW_ORDER_TABLE.group_number = ENTRY_DB_GROUP.group_number
 					SM3_ENTRY_DB_NEW_ORDER_TABLE.symbol = new_symbol
 					SM3_ENTRY_DB_NEW_ORDER_TABLE.action = new_action
@@ -483,9 +555,11 @@ Function Read_DB_NEW_ORDER_TABLE:
 					SM3_ENTRY_DB_NEW_ORDER_TABLE.secType = (sym_A == TRUE) ? ENTRY_DB_GROUP.SecType_B : ENTRY_DB_GROUP.SecType_A
 					SM3_ENTRY_DB_NEW_ORDER_TABLE.currency = (sym_A == TRUE) ? ENTRY_DB_GROUP.Currency_B : ENTRY_DB_GROUP.Currency_A
 					SAVE(DB_NEW_ORDER_TABLE, SM3_ENTRY_DB_NEW_ORDER_TABLE)
+					#ReRead the table - get the newly saved entry, to get the guaranted order_number
+					SM3_ENTRY_DB_NEW_ORDER_TABLE =  DB_NEW_ORDER_TABLE.auto_generated_randomID == auto_generated_randomID
 					ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "OnHold"
 					ENTRY_DB_GROUP.PendingHoldOrderNumber = SM3_ENTRY_DB_NEW_ORDER_TABLE.order_number 
-					ENTRY_DB_GROUP.PendingHoldOrderID = 0
+					ENTRY_DB_GROUP.PendingHoldIBOrderID = 0
 					ENTRY_DB_NEW_ORDER_TABLE.pending_hold_order_number = SM3_ENTRY_DB_NEW_ORDER_TABLE.order_number
 				endif
 			endif
@@ -494,6 +568,13 @@ Function Read_DB_NEW_ORDER_TABLE:
 
 	end
 		
+
+Function generate_unique_randomid
+import base64
+import uuid
+
+	uniqid = base64.urlsafe_b64encode(uuid.uuid4().bytes)
+	return uniqid
 
 Function FillDBGroupEntries(ENTRY_DB_GROUP, ENTRY_GET_ALL_EXECUTIONS)
 ### fill the shares filled, prices etc etc
@@ -520,13 +601,17 @@ Function CompleteExecutionDBGroup(ENTRY_GET_ALL_EXECUTIONS)
 		LogError("Group number not found " + group_number
 		return
 	endif
-	ENTRY_DB_GROUP.PendingHoldOrderID = ENTRY_GET_ALL_EXECUTIONS.orderid
-	if DB_NEW_ORDER_TABLE.pending_hold_order_number != 0 then
+	if ENTRY_DB_GROUP.pending_hold_order_number != 0 then
 		ENTRY_DB_NEW_ORDER_TABLE = DB_NEW_ORDER_TABLE.pending_hold_order_number == ENTRY_DB_GROUP.PendingHoldOrderNumber
 		if ENTRY_DB_NEW_ORDER_TABLE == NULL then
 			LogError("ENTRY_DB_NEW_ORDER_TABLE not found for pending_hold_order_number" + pending_hold_order_number)
-		return
+			return
+		endif
 		ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Initialized"
+	endif
+	ENTRY_DB_NEW_ORDER_TABLE =  (DB_NEW_ORDER_TABLE.order_number == ENTRY_DB_GROUP.order_number )
+	if ENTRY_DB_NEW_ORDER_TABLE != NULL then
+		ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Executed"
 	endif
 	FillDBGroupEntries(ENTRY_DB_GROUP, ENTRY_GET_ALL_EXECUTIONS)
 
@@ -563,3 +648,4 @@ Background:
 	Fill_DB_All_Open_Order
 	Fill_DB_Execution
 	Fill_DB_BROKER_Portfolio
+	Read_DB_NEW_ORDER_TABLE
