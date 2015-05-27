@@ -383,9 +383,10 @@ PERIODIC Function Read_DB_NEW_ORDER_TABLE:
 		   continue # the for loop
 		endif
 		symbol = ENTRY_DB_NEW_ORDER_TABLE.symbol
+		pairsymbol = ENTRY_DB_NEW_ORDER_TABLE.pairsymbol
 		ENTRY_DB_GROUP = (DB_GROUP.Symbol_A == symbol || DB_GROUP.Symbol_B == symbol)
 		if ENTRY_DB_GROUP == NULL then
-			dump_table(DB_GROUP, "PairSymbolsNotFound " + symbol + " " + pair_symbol)
+			dump_table(DB_GROUP, "PairSymbolsNotFound " + symbol + " " + pairsymbol)
 			return DB_GROUP_INCONSISTENT_STATE
 		endif
 		pair_position_type = ENTRY_DB_GROUP.PAIR_POSITION_TYPE
