@@ -108,14 +108,14 @@ CREATE TABLE if not exists DB_BROKER_EXEC_REPORT (
 	execprice   DECIMAL(10,4), 
 	exchange   VARCHAR(10), 
 	permid   INT, 
-	execid   VARCHAR(32), 
+	execid   VARCHAR(32) PRIMARY KEY, 
 	clientid   INT, 
 	qty_filled   INT, 
 	avgprice   DECIMAL(10,4), 
 	execshares   INT, 
 	expiry   VARCHAR(20), 
 	side   VARCHAR(10), 
-	exectime   DATETIME PRIMARY KEY
+	exectime   DATETIME
 );
 
 CREATE TABLE if not exists DB_GET_ALL_EXECUTIONS (
