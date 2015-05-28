@@ -1,217 +1,258 @@
 
-DB_ACCOUNT_INFO
-	Account_Number VARCHAR(20) (INDEX) PROTECTED
-	Account_Broker VARCHAR(20) PROTECTED
-	Account_Name   VARCHAR(20) PROTECTED
-	Account_Value DECIMAL(10,2)
-	GW_TCP_PORT_NUM INT PROTECTED
-	TWS_TCP_PORT_NUM INT PROTECTED
-	GW_TCP_IP_ADDR VARCHAR(20) PROTECTED
-	TWS_TCP_IP_ADDR VARCHAR(20) PROTECTED
+drop database if exists MWPAPER2;
+CREATE DATABASE if not exists MWPAPER2 ;
+use MWPAPER2;
+CREATE TABLE if not exists DB_ACCOUNT_INFO (
+	Account_Number VARCHAR(20) PRIMARY KEY,
+	Account_Broker VARCHAR(20) ,
+	Account_Name   VARCHAR(20) ,
+	Account_Value DECIMAL(10,2),
+	GW_TCP_PORT_NUM INT ,
+	TWS_TCP_PORT_NUM INT ,
+	GW_TCP_IP_ADDR VARCHAR(20) ,
+	TWS_TCP_IP_ADDR VARCHAR(20) ,
 	TimeLastSynced DATETIME
+);
 
 
-DB_ORDERS_PLACED
+CREATE TABLE if not exists DB_ORDERS_PLACED (
 
-   order_open_time DATETIME
-   order_filled_time DATETIME
-   signalPrice   DECIMAL(10,4)
+   order_open_time DATETIME, 
+   order_filled_time DATETIME, 
+   signalPrice   DECIMAL(10,4), 
 
-   IB_orderid   INT (INDEX)
-   symbol   VARCHAR(20)
-   sectype   VARCHAR(10)
-   currency   VARCHAR(10)
-   exchange   VARCHAR(10)
-   qty_requested   INT
-   qty_filled   INT
-   limit_price   DECIMAL(10,4)
-   order_action   VARCHAR(10)
-   order_type   VARCHAR(10)
-   account_number   VARCHAR(10)
-   holding_type   VARCHAR(10) (LONG/SHORT)
-   order_completed   BOOLEAN
-   order_partial_filled   BOOLEAN
-   commission DECIMAL(10,2)
-   totalvalue DECIMAL(10,2)
-   avgprice   DECIMAL(10,4)
-   group_number INT
+   IB_orderid   INT PRIMARY KEY,
+   symbol   VARCHAR(20) ,
+   sectype   VARCHAR(10) ,
+   currency   VARCHAR(10) ,
+   exchange   VARCHAR(10) ,
+   qty_requested   INT ,
+   qty_filled   INT ,
+   limit_price   DECIMAL(10,4) ,
+   order_action   VARCHAR(10) ,
+   order_type   VARCHAR(10) ,
+   account_number   VARCHAR(10) ,
+   holding_type   VARCHAR(10) , 
+   order_completed   BOOL DEFAULT FALSE,
+   order_partial_filled   BOOL DEFAULT FALSE, 
+   commission DECIMAL(10,2), 
+   totalvalue DECIMAL(10,2), 
+   avgprice   DECIMAL(10,4), 
+   group_number INT, 
    order_number INT
+);
 
 
-DB_OUTSTANDING_ORDERS
-   symbol   VARCHAR(20)
-   IB_orderid   INT (INDEX)
-   is_order_open   BOOLEAN
-   is_order_canceled   BOOLEAN
-   order_open_time   DATETIME
-   order_filled_time   DATETIME
-   group_number INT
+CREATE TABLE if not exists DB_OUTSTANDING_ORDERS(
+   symbol   VARCHAR(20) , 
+   IB_orderid   INT PRIMARY KEY,
+   is_order_open   BOOL DEFAULT FALSE, 
+   is_order_canceled   BOOL DEFAULT FALSE, 
+   order_open_time   DATETIME, 
+   order_filled_time   DATETIME, 
+   group_number INT, 
    order_number INT
+);
 			
 
-DB_LOCAL_PORTFOLIO
-	Same as DB_ORDERS_PLACED
+
+CREATE TABLE if not exists DB_LOCAL_PORTFOLIO (
+
+   order_open_time DATETIME, 
+   order_filled_time DATETIME, 
+   signalPrice   DECIMAL(10,4), 
+
+   IB_orderid   INT PRIMARY KEY,
+   symbol   VARCHAR(20) ,
+   sectype   VARCHAR(10) ,
+   currency   VARCHAR(10) ,
+   exchange   VARCHAR(10) ,
+   qty_requested   INT ,
+   qty_filled   INT ,
+   limit_price   DECIMAL(10,4) ,
+   order_action   VARCHAR(10) ,
+   order_type   VARCHAR(10) ,
+   account_number   VARCHAR(10) ,
+   holding_type   VARCHAR(10) , 
+   order_completed   BOOL DEFAULT FALSE,
+   order_partial_filled   BOOL DEFAULT FALSE, 
+   commission DECIMAL(10,2), 
+   totalvalue DECIMAL(10,2), 
+   avgprice   DECIMAL(10,4), 
+   group_number INT, 
+   order_number INT
+);
 
 
-DB_BROKER_PORTFOLIO
-   symbol   VARCHAR(20)
-   complete_symbol_type   VARCHAR(32) (INDEX)
-   holding_type   VARCHAR(10)
-   quantity    INT
-   marketValue   DECIMAL(10,2)
-   costPrice   DECIMAL(10,2)
-   gnloss   DECIMAL(10,2)
-   marketPrice   DECIMAL(10,4)
-   averageCost   DECIMAL(10,4)
+
+CREATE TABLE if not exists DB_BROKER_PORTFOLIO (
+   symbol   VARCHAR(20), 
+   complete_symbol_type   VARCHAR(32) PRIMARY KEY,
+   holding_type   VARCHAR(10),
+   quantity    INT,
+   marketValue   DECIMAL(10,2),
+   costPrice   DECIMAL(10,2),
+   gnloss   DECIMAL(10,2),
+   marketPrice   DECIMAL(10,4),
+   averageCost   DECIMAL(10,4),
    accountName   VARCHAR(10)
-
-
-DB_BROKER_EXEC_REPORT
+);
 
 #EUR {'orderid': '1', 'account': 'DU226708', 'execprice': 1.11865, 'exchange': 'IDEALPRO', 'symbol': 'EUR', 'permid': 2137440949, 'execid': '0001f4e8.55493475.01.01', 'clientid': '8899', 'qty': 1000000, 'avgprice': 1.11865, 'execshares': 1000000, 'expiry': '', 'side': 'SLD', 'times': '20150505  15:01:53'}
-	IB_orderid   INT
-	symbol   VARCHAR(20)
-	account_number   VARCHAR(10)
-	execprice   DECIMAL(10,4)
-	exchange   VARCHAR(10)
-	permid   INT
-	execid   VARCHAR(32)
-	clientid   INT
-	qty_filled   INT
-	avgprice   DECIMAL(10,4)
-	execshares   INT
-	expiry   VARCHAR(20)
-	side   VARCHAR(10)
-	exectime   DATETIME (INDEX)
 
-DB_GET_ALL_EXECUTIONS
-	IB_orderid   INT (INDEX)
-	symbol   VARCHAR(20)
-	side   VARCHAR(10)
-	qty_filled   INT
-	numexec   INT
-	avgprice   DECIMAL(10,4)
-	total_value INT
-	commissions DECIMAL(10,2)
-	last_exectime   DATETIME
-    group_number INT
+CREATE TABLE if not exists DB_BROKER_EXEC_REPORT (
+
+	IB_orderid   INT,
+	symbol   VARCHAR(20), 
+	account_number   VARCHAR(10), 
+	execprice   DECIMAL(10,4), 
+	exchange   VARCHAR(10), 
+	permid   INT, 
+	execid   VARCHAR(32), 
+	clientid   INT, 
+	qty_filled   INT, 
+	avgprice   DECIMAL(10,4), 
+	execshares   INT, 
+	expiry   VARCHAR(20), 
+	side   VARCHAR(10), 
+	exectime   DATETIME PRIMARY KEY
+);
+
+CREATE TABLE if not exists DB_GET_ALL_EXECUTIONS (
+	IB_orderid   INT PRIMARY KEY,
+	symbol   VARCHAR(20),
+	side   VARCHAR(10),
+	qty_filled   INT,
+	numexec   INT,
+	avgprice   DECIMAL(10,4),
+	total_value INT,
+	commissions DECIMAL(10,2),
+	last_exectime   DATETIME,
+    group_number INT,
     order_number INT
+);
 
-#	24 EUR EUR.USD Submitted CASH BUY LMT 100000 1.01 USD IDEALPRO
-DB_OPEN_ORDERS
-	IB_orderid   INT (INDEX)
-	symbol   VARCHAR(20)
-    complete_symbol_type   VARCHAR(32) (INDEX)
-	status VARCHAR(20)
-    sectype   VARCHAR(10)
-    order_action   VARCHAR(10)
-    order_type   VARCHAR(10)
-	quantity INT
-	limitprice DECIMAL(10,4)
-    currency   VARCHAR(10)
+CREATE TABLE if not exists DB_OPEN_ORDERS (
+	IB_orderid   INT PRIMARY KEY,
+	symbol   VARCHAR(20),
+    complete_symbol_type   VARCHAR(32) ,
+	status VARCHAR(20),
+    sectype   VARCHAR(10),
+    order_action   VARCHAR(10),
+    order_type   VARCHAR(10),
+	quantity INT,
+	limitprice DECIMAL(10,4),
+    currency   VARCHAR(10),
     exchange   VARCHAR(10)
+	);
 
 
 # 25000 25000 UVXY XIV 0 0
 # 25000 0 UVXY XIV 1000 0
 # 25000 0 UVXY XIV 0 1000
 # 25000 12500 UVXY 500 0
-@Function : Update DB_GROUP as the orders execute, fill partial info (impt)
-DB_GROUP
-	AUTOINCR group_number
-	Initial_equity INT PROTECTED
-	Current_equity INT
-	IS_PAIR_TRADING BOOLEAN PROTECTED
+#@Function : Update DB_GROUP as the orders execute, fill partial info (impt)
+CREATE TABLE if not exists DB_GROUP(
+	group_number INT NOT NULL  AUTO_INCREMENT PRIMARY KEY,
+	Initial_equity INT ,
+	Current_equity INT,
+	IS_PAIR_TRADING BOOL DEFAULT FALSE, 
 
-	DONT_TRADE BOOLEAN
+	DONT_TRADE BOOL DEFAULT FALSE,
 
-	PAIR_POSITION_TYPE CHAR(20) #  ( 'CASH', 'A', 'B', 'BUSTED')
-	LastIBOrderID INT
-	WaitingTobeFilled BOOLEAN
-	PendingHoldOrderNumber INT
-	PendingHoldIBOrderID INT
-	CurrentOrderNumber INT
+	PAIR_POSITION_TYPE CHAR(20),  #  ( 'CASH', 'A', 'B', 'BUSTED')
+	LastIBOrderID INT,
+	WaitingTobeFilled BOOL DEFAULT FALSE,
+	PendingHoldOrderNumber INT,
+	PendingHoldIBOrderID INT,
+	CurrentOrderNumber INT,
 
-	NewOrderAction CHAR(10) # BUY/SELL
-	NewOrderType CHAR(10) # MKT/LMT
-	NewOrderState CHAR(10) # ('None', 'Initialized', 'OnHold', 'Placed', 'Submitted', 'Executed' , 'Canceled')
+	NewOrderAction CHAR(10) , # BUY/SELL
+	NewOrderType CHAR(10), # MKT/LMT
+	NewOrderState CHAR(10),  # ('None', 'Initialized', 'OnHold', 'Placed', 'Submitted', 'Executed' , 'Canceled')
 
 
-	Symbol_A CHAR(20) PROTECTED
-	LongAllow_A BOOLEAN PROTECTED
-	ShortAllow_A BOOLEAN PROTECTED
-	Leverage_A DECIMAL(5,2) PROTECTED
-	Exchange_A CHAR(10) PROTECTED
-	Currency_A CHAR(10) PROTECTED
-	SecType_A CHAR(10) PROTECTED
-
-## valid only if IS_PAIR_TRADING is TRUE
-	Symbol_B CHAR(20) PROTECTED # 'NONE'
-	LongAllow_B BOOLEAN PROTECTED
-	ShortAllow_B BOOLEAN PROTECTED
-	Leverage_B DECIMAL(5,2) PROTECTED
-	Exchange_B CHAR(10) PROTECTED
-	Currency_B CHAR(10) PROTECTED
-	SecType_B CHAR(10) PROTECTED
-
-	Shares_Requested_A INT
-	Shares_Filled_A INT
-	Shares_Remaining_A INT
-	Position_HoldingType_A CHAR(20) # LastAction LONG/SHORT/NONE
-	Market_Value_A INT
-	Partial_Fill_A BOOLEAN
-
+	Symbol_A CHAR(20) ,
+	LongAllow_A BOOL DEFAULT FALSE, 
+	ShortAllow_A BOOL  DEFAULT FALSE,
+	Leverage_A DECIMAL(5,2) ,
+	Exchange_A CHAR(10) ,
+	Currency_A CHAR(10) ,
+	SecType_A CHAR(10) ,
 
 ## valid only if IS_PAIR_TRADING is TRUE
-	Shares_Requested_B INT
-	Shares_Filled_B INT
-	Shares_Remaining_B INT
-	Position_HoldingType_B CHAR(20) # LastAction LONG/SHORT/NONE
-	Market_Value_B INT
-	Partial_Fill_B BOOLEAN
+	Symbol_B CHAR(20), 
+	LongAllow_B BOOL  DEFAULT FALSE,
+	ShortAllow_B BOOL  DEFAULT FALSE,
+	Leverage_B DECIMAL(5,2) ,
+	Exchange_B CHAR(10) ,
+	Currency_B CHAR(10) ,
+	SecType_B CHAR(10) ,
 
-	Total_Shares_BUY_A INT
-	Total_Shares_SELL_A INT
-	Total_MarketValue_BUY_A INT
-	Total_MarketValue_SELL_A INT
-	Total_MarketValue_Traded_A INT
-	Total_Commission_A DECIMAL (10, 2)
+	Shares_Requested_A INT,
+	Shares_Filled_A INT,
+	Shares_Remaining_A INT,
+	Position_HoldingType_A CHAR(20), # LastAction LONG/SHORT/NONE
+	Market_Value_A INT,
+	Partial_Fill_A BOOL default FALSE,
+
 
 ## valid only if IS_PAIR_TRADING is TRUE
-	Total_Shares_BUY_B INT
-	Total_Shares_SELL_B INT
-	Total_MarketValue_BUY_B INT
-	Total_MarketValue_SELL_B INT
-	Total_MarketValue_Traded_B INT
+	Shares_Requested_B INT,
+	Shares_Filled_B INT,
+	Shares_Remaining_B INT,
+	Position_HoldingType_B CHAR(20), # LastAction LONG/SHORT/NONE
+	Market_Value_B INT,
+	Partial_Fill_B BOOL default FALSE,
+
+	Total_Shares_BUY_A INT,
+	Total_Shares_SELL_A INT,
+	Total_MarketValue_BUY_A INT,
+	Total_MarketValue_SELL_A INT,
+	Total_MarketValue_Traded_A INT,
+	Total_Commission_A DECIMAL (10, 2),
+
+## valid only if IS_PAIR_TRADING is TRUE
+	Total_Shares_BUY_B INT,
+	Total_Shares_SELL_B INT,
+	Total_MarketValue_BUY_B INT,
+	Total_MarketValue_SELL_B INT,
+	Total_MarketValue_Traded_B INT,
 	Total_Commission_B DECIMAL (10, 2)
+	);
 
 ### @Function Read_NEW_ORDER_TABLE_and_Execute
-DB_NEW_ORDER_TABLE
+CREATE TABLE if not exists  DB_NEW_ORDER_TABLE(
 
-	AUTOINCR order_number INDEX
-	IB_orderid INT
-	symbol CHAR(20)
-	pairsymbol CHAR(20) # default 'NONE'
-	action CHAR(10) # BUY/SELL
-	orderType CHAR(10) # MKT/LMT
-	signalPrice DECIMAL(10,4)
-	currentPrice DECIMAL(10,4)
-	limitPrice DECIMAL(10,4)
+	order_number INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+	symbol CHAR(20),
+	pairsymbol CHAR(20) DEFAULT "NONE", # default 'NONE'
+	action CHAR(10),  # BUY/SELL
+	orderType CHAR(10) ,# MKT/LMT
+	signalPrice DECIMAL(10,4),
+	currentPrice DECIMAL(10,4),
+	limitPrice DECIMAL(10,4),
 
-	group_number INT
-	pending_hold_order_number INT
-	sharestotrade INT
-	orderstatus CHAR(20) #  ('None', 'Initialized', 'OnHold', 'Placed', 'Submitted', 'Executed' , 'Canceled')
-	exchange CHAR(10) PROTECTED
-	currency CHAR(10) PROTECTED
-	secType CHAR(10) PROTECTED
+	IB_orderid INT,
+	group_number INT,
+	pending_hold_order_number INT,
+	sharestotrade INT,
+	orderstatus CHAR(20) , #  ('None', 'Initialized', 'OnHold', 'Placed', 'Submitted', 'Executed' , 'Canceled')
+	exchange CHAR(10) ,
+	currency CHAR(10) ,
+	secType CHAR(10) ,
+	auto_generated_randomID CHAR(32), 
 	signalTime DATETIME
+	);
 
 
-DB_CURRENT_QUOTE
-	symbol CHAR(20)
-	last_price DECIMAL(10,4)
-	last_time DATETIME
+CREATE TABLE if not exists  DB_CURRENT_QUOTE(
+	symbol CHAR(20),
+	last_trade_price DECIMAL(10,4),
+	last_trade_time DATETIME,
+	last_bid_price DECIMAL(10,4),
+	last_bid_time DATETIME,
 	volume INT
+);
 
-#CONCEPT PROTECTED : grant *.* user(master), grant !PROTECTED user(stocktrader), connect to mysql as user(stocktrader)
+#CONCEPT  : grant *.* user(master), grant !PROTECTED user(stocktrader), connect to mysql as user(stocktrader)
