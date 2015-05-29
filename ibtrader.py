@@ -937,7 +937,7 @@ if args.print_open_orders or args.cancel_all_orders or args.cancel_sym_order or 
     for key in openorders:
         localSymbol = key["localSymbol"]
         orderid = key["orderid"]
-		if args.symbol == None or args.symbol == localSymbol:
+        if args.symbol == None or args.symbol == localSymbol:
            print_json_dictword(key)
         #if args.print_open_orders:
 #        print "%d %s %s %s %s %s %s %s %s %s %s " % (key, sym, val["localSymbol"], val["orderState_status"], val["secType"], val["action"], val["orderType"], val["qty"], val["limitPrice"], val["currency"], val["exchange"])
