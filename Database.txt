@@ -6,6 +6,7 @@ CREATE TABLE if not exists DB_ACCOUNT_INFO (
 	Account_Number VARCHAR(20) PRIMARY KEY,
 	Account_Broker VARCHAR(20) ,
 	Account_Name   VARCHAR(20) ,
+	program_name   VARCHAR(20) ,
 	Account_Value DECIMAL(10,2),
 	GW_TCP_PORT_NUM INT ,
 	TWS_TCP_PORT_NUM INT ,
