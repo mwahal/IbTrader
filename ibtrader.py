@@ -101,6 +101,7 @@ def get_IB_positions():
     global portfolio_structure
     global portfolio_holdings
     global account_value
+    global base_currency_cash
     global debug
 
     request_finished=False
@@ -132,6 +133,12 @@ def get_IB_positions():
         if x[0]=="ExchangeRate":
             exchange_rates[x[2]]=float(x[1])
         if x[0]=="TotalCashBalance":
+            if debug:
+               print "x[0] = ", x[0], 
+               print "x[1] = ", x[1], 
+               print "x[2] = ", x[2] 
+            if x[2] == "BASE":
+                base_currency_cash = int(x[1])
             total_cash_balance[x[2]]=int(x[1])
             if x[2] in portfolio_holdings:
                portfolio_holdings[x[2]]["quantity"] = int(x[1])
@@ -358,7 +365,7 @@ class IBClient(EWrapper):
         #print "ERROR errorCode = %d errorString = %s" % (errorCode, errorString)
         if errorCode in ERRORS_TO_TRIGGER:
             iserror=True
-            errormsg="IB error id %d errorcode %d string %s" %(id, errorCode, errorString)
+            errormsg="Code=%d IB error id %d errorcode %d string %s" %(errorCode, id, errorCode, errorString)
             if is_placing_order == False:
                 print errormsg
             finished=True  
@@ -476,7 +483,11 @@ class IBClient(EWrapper):
            partial_avg_price_per_share = execution.avgPrice
            partial_shares_filled = execution.cumQty
            myexecdetails[execution.execId] = execution
-           if (order.totalQuantity == execution.cumQty) or request_finished:
+           if (order.totalQuantity == execution.cumQty):
+              all_trades_filled = 1
+           if all_comm_filled and ((order.totalQuantity == execution.cumQty) or request_finished):
+              if debug:
+                 print "request_finished is %s " % request_finished
               partial_avg_price_per_share = 0
               partial_shares_filled = 0
               all_trades_filled = 1
@@ -484,7 +495,10 @@ class IBClient(EWrapper):
               total_shares_filled = execution.cumQty
               total_commission_paid = 0
               for key in myexecdetails.items():
-                  total_commission_paid += mycommdetails[key]
+                  if key in mycommdetails:
+                      total_commission_paid += mycommdetails[key]
+                  else:
+                      print key
               if debug:
                  print "AvgPrice = %.4f TotalFilled = %d TotalComm = %.2f" % (execution.avgPrice, execution.cumQty, total_comm)
               if (all_comm_filled == 1):
@@ -612,6 +626,8 @@ order_structure = []
 MEANINGLESS_NUMBER=1729
 is_placing_order = False
 errormsg = ""
+account_number=""
+base_currency_cash=0
 
 # Instantiate our callback object
 callback = IBClient()
@@ -639,12 +655,14 @@ parser.add_argument('-oo', '--order_type', default='not_a_type', help="Order Typ
 parser.add_argument('-oid', '--order_id', default='not_a_order_id', help="Order ID - used to search execution")
 parser.add_argument('-oq', '--order_quantity', default='not_a_quantity', help="Order Quantity")
 parser.add_argument('-pf', '--print_portfolio', action='store_true', help="Print Portfolio")
+parser.add_argument('-pc', '--print_cash', action='store_true', help="Print Cash in Portfolio")
 parser.add_argument('-pp', '--print_positions', action='store_true', help="Print ALL Positions")
 parser.add_argument('-ps', '--print_sym_position', action='store_true', help="Print Position for Symbol")
 parser.add_argument('-pe', '--print_executions', action='store_true', help="Print Executions")
 parser.add_argument('-pse', '--print_sym_executions', action='store_true', help="Print Executions for Symbol")
 parser.add_argument('-pid', '--print_order_id', action='store_true', help="Print Executions By Order ID")
 parser.add_argument('-po', '--print_open_orders', action='store_true', help="Print Open Orders")
+parser.add_argument('-pso', '--print_open_sym_orders', action='store_true', help="Print Open Orders for Symbol")
 parser.add_argument('-d', '--debug', action='store_true', help="Debug enable")
 parser.add_argument('-nod', '--no-debug', action='store_false', help="Debug disable")
 parser.add_argument('-tcp', '--tcp_port', default='not_a_tcp_port', help="Tcp port to use, default is 4001")
@@ -682,6 +700,7 @@ if debug:
     print "order_type ", args.order_type
     print "order_quantity ", args.order_quantity
     print "print_portfolio ", args.print_portfolio
+    print "print_cash ", args.print_cash
     print "print_positions ", args.print_positions
     print "print_sym_position ", args.print_sym_position
     print "print_executions ", args.print_executions
@@ -689,6 +708,7 @@ if debug:
     print "print_order_id ", args.print_order_id
     print "print_sym_executions ", args.print_sym_executions
     print "print_open_orders ", args.print_open_orders
+    print "print_open_sym_orders ", args.print_open_sym_orders
     print "close_all_positions ", args.close_all_positions
     print "close_sym_position ", args.close_sym_position
     print "cancel_sym_order ", args.cancel_sym_order
@@ -845,8 +865,12 @@ if args.print_executions or args.print_sym_executions or args.print_order_id:
            print_json_dictword(key)
    print_json_end()
 
-if args.print_portfolio or args.print_positions or args.print_sym_position:
+if args.print_portfolio or args.print_positions or args.print_sym_position or args.print_cash:
     myport = get_IB_positions()
+    if args.print_cash:
+        print base_currency_cash
+        pass
+
     #portfolio_structure, exchange_rates, portfolio_holdings, total_cash_balance
     port_struct = myport[0]
     exch_rates = myport[1]
@@ -864,15 +888,16 @@ if args.print_portfolio or args.print_positions or args.print_sym_position:
 
     if debug:
         print "Portfolio Holdings"
-    print_json_start("PortfolioHoldings")
-    for key in  port_holdings:
-        if debug:
-           print "Port_Holdings %s" % (key)
-        qty = key["quantity"]
-        sym = key["localSymbol"]
-        if qty != 0 and (args.print_positions or (args.print_sym_position and sym == args.symbol)):
-            print_json_dictword(key)
-    print_json_end()
+    if args.print_portfolio or args.print_positions or args.print_sym_position:
+        print_json_start("PortfolioHoldings")
+        for key in  port_holdings:
+            if debug:
+               print "Port_Holdings %s" % (key)
+            qty = key["quantity"]
+            sym = key["localSymbol"]
+            if qty != 0 and (args.print_positions or (args.print_sym_position and sym == args.symbol)):
+                print_json_dictword(key)
+        print_json_end()
 
 
 if args.close_all_positions or args.close_sym_position:
@@ -901,18 +926,19 @@ if args.close_all_positions or args.close_sym_position:
             order_primaryexchange = order_exchange
             place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, accountName)
 #24 {'orderid': 24L, 'exchange': 'IDEALPRO', 'secType': 'CASH', 'orderType': 'LMT', 'primaryExchange': '', 'clientid': 8899L, 'qty': 100000, 'currency': 'USD', 'contract': <swigibpy.Contract; proxy of <Swig Object of type 'Contract *' at 0x7fb0883a2480> >, 'action': 'BUY', 'expiry': '', 'symbol': 'EUR', 'quantity': 100000L, 'side': 'BUY'}
-if args.print_open_orders or args.cancel_all_orders or args.cancel_sym_order:
+if args.print_open_orders or args.cancel_all_orders or args.cancel_sym_order or args.print_open_sym_orders:
     openorders = get_open_orders()
     if debug:
         print "Active orders: (should just be limit order)"
-    if args.print_open_orders:
+    if args.print_open_orders or args.print_open_sym_orders:
        print_json_start("OpenOrders")
     if args.cancel_all_orders or args.cancel_sym_order:
        print_json_start("CancelOrders")
     for key in openorders:
         localSymbol = key["localSymbol"]
         orderid = key["orderid"]
-        print_json_dictword(key)
+		if args.symbol == None or args.symbol == localSymbol:
+           print_json_dictword(key)
         #if args.print_open_orders:
 #        print "%d %s %s %s %s %s %s %s %s %s %s " % (key, sym, val["localSymbol"], val["orderState_status"], val["secType"], val["action"], val["orderType"], val["qty"], val["limitPrice"], val["currency"], val["exchange"])
         
