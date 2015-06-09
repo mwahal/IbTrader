@@ -390,7 +390,7 @@ PERIODIC Function Read_DB_NEW_ORDER_TABLE:
 			return DB_GROUP_INCONSISTENT_STATE
 		endif
 		pair_position_type = ENTRY_DB_GROUP.PAIR_POSITION_TYPE
-		if pair_position_type == 'BUSTED' OR ENTRY_DB_GROUP == TRUE then
+		if pair_position_type == 'BUSTED' OR ENTRY_DB_GROUP.DONT_TRADE == TRUE then
 			continue # the for loop
 		endif
 		if (ENTRY_DB_GROUP.IS_PAIR_TRADING == TRUE) then
@@ -404,168 +404,170 @@ PERIODIC Function Read_DB_NEW_ORDER_TABLE:
 					return DB_GROUP_INCONSISTENT_STATE
 				endif
 			endif
-			Current_equity = ENTRY_DB_GROUP.Current_equity
-			
-			if ENTRY_DB_GROUP.Symbol_A == symbol then
-				sym_A = TRUE
-				sym_B = FALSE
-			else
-				sym_B = TRUE
-				sym_A = FALSE
-			endif
-
-
-			# state machine 1 or 2
-			if (pair_position_type == "CASH") OR
-				(sym_A  == TRUE && pair_position_type == 'A') OR
-				(sym_B  == TRUE && pair_position_type == 'B' ) then
-
-				leverage = (sym_A == TRUE) ? ENTRY_DB_GROUP.Leverage_A : ENTRY_DB_GROUP.Leverage_B
-				ok_long = (sym_A == TRUE) ? ENTRY_DB_GROUP.LongAllow_A : ENTRY_DB_GROUP.LongAllow_B
-				ok_short = (sym_A == TRUE) ? ENTRY_DB_GROUP.ShortAllow_A : ENTRY_DB_GROUP.ShortAllow_B
-				ENTRY_DB_NEW_ORDER_TABLE.exchange = (sym_A == TRUE) ? ENTRY_DB_GROUP.Exchange_A : ENTRY_DB_GROUP.Exchange_B
-				ENTRY_DB_NEW_ORDER_TABLE.currency = (sym_A == TRUE) ? ENTRY_DB_GROUP.Currency_A : ENTRY_DB_GROUP.Currency_B
-				ENTRY_DB_NEW_ORDER_TABLE.secType = (sym_A == TRUE) ? ENTRY_DB_GROUP.SecType_A : ENTRY_DB_GROUP.SecType_B
-				sharesholding = (sym_A == TRUE) ? ENTRY_DB_GROUP.Shares_Filled_A : ENTRY_DB_GROUP.Shares_Filled_B
-
-				if (pair_position_type == "CASH")
-					Position_HoldingType = "NONE"
-				else
-					Position_HoldingType = (sym_A == TRUE) ? ENTRY_DB_GROUP.Position_HoldingType_A : ENTRY_DB_GROUP.Position_HoldingType_B
-				endif
-
-				if (orderAction == "BUY") then
-
-					if (Position_HoldingType == "NONE" || Position_HoldingType == "LONG") then
-						if (Position_HoldingType == "NONE" AND ok_long == FALSE) then
-							LOG_MESSAGE(ENTRY_DB_NEW_ORDER_TABLE, "LongNotAllowed for " + symbol
-							DELETE(DB_NEW_ORDER_TABLE, ENTRY_DB_NEW_ORDER_TABLE)
-							continue
-						endif
-						if (NotTradeableEquity(Current_equity)) then
-							ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Invalid"
-							if (Position_HoldingType == "NONE") then
-								ENTRY_DB_GROUP.DONT_TRADE = TRUE
-								ENTRY_DB_GROUP.PAIR_POSITION_TYPE = "BUSTED"
-								LOG_MESSAGE(ENTRY_DB_GROUP, "Ran out of money")
-							else
-								LOG_MESSAGE(ENTRY_DB_GROUP, "Can not add long positions for " + symbol)
-							endif
-							continue
-						endif
-
-						ENTRY_DB_NEW_ORDER_TABLE.currentPrice = get_current_price(symbol)
-						sharestotrade = get_shares_quantity(symbol, leverage, Current_equity, ENTRY_DB_NEW_ORDER_TABLE.currentPrice)
-						if (sym_A == TRUE)
-							ENTRY_DB_GROUP.Shares_Requested_A = sharestotrade
-						else
-							ENTRY_DB_GROUP.Shares_Requested_B = sharestotrade
-						retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "LONG")
-						if (retcode != SUCCESS) then
-							continue
-						endif
-						ThisOrderState = "OpenLong"
-
-					else if (Position_HoldingType == "SHORT") then
-						sharestotrade = sharesholding
-						if (sym_A == TRUE)
-							ENTRY_DB_GROUP.Shares_Requested_A = sharestotrade
-						else
-							ENTRY_DB_GROUP.Shares_Requested_B = sharestotrade
-						retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "LONG")
-						if (retcode != SUCCESS) then
-							continue
-						endif
-						ThisOrderState = "CloseShort"
-					else
-						dump_table(DB_GROUP, "Inconsisten Position Type")
-						return DB_GROUP_INCONSISTENT_STATE
-					endif
-
-				else if (orderAction == "SELL") then
-
-					if (Position_HoldingType == "NONE" || Position_HoldingType == "SHORT") then
-						if (Position_HoldingType == "NONE" AND ok_short == FALSE) then
-							LOG_MESSAGE(ENTRY_DB_NEW_ORDER_TABLE, "ShortNotAllowed for " + symbol)
-							DELETE(DB_NEW_ORDER_TABLE, ENTRY_DB_NEW_ORDER_TABLE)
-							continue
-						endif
-						if (NotTradeableEquity(Current_equity)) then
-							ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Invalid"
-							if (Position_HoldingType == "NONE") then
-								ENTRY_DB_GROUP.DONT_TRADE = TRUE
-								ENTRY_DB_GROUP.PAIR_POSITION_TYPE = "BUSTED"
-								LOG_MESSAGE(ENTRY_DB_GROUP, "Ran out of money")
-							else
-								LOG_MESSAGE(ENTRY_DB_GROUP, "Can not add short positions for " + symbol)
-							endif
-							continue
-						endif
-
-						ENTRY_DB_NEW_ORDER_TABLE.currentPrice = get_current_price(symbol)
-						sharestotrade = get_shares_quantity(symbol, leverage, Current_equity, ENTRY_DB_NEW_ORDER_TABLE.currentPrice)
-						if (sym_A == TRUE)
-							ENTRY_DB_GROUP.Shares_Requested_A = sharestotrade
-						else
-							ENTRY_DB_GROUP.Shares_Requested_B = sharestotrade
-						retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "SELL")
-						if (retcode != SUCCESS) then
-							continue
-						endif
-						ThisOrderState = "OpenShort"
-
-					else if (Position_HoldingType == "Long") then
-						sharestotrade = sharesholding
-						if (sym_A == TRUE)
-							ENTRY_DB_GROUP.Shares_Requested_A = sharestotrade
-						else
-							ENTRY_DB_GROUP.Shares_Requested_B = sharestotrade
-						retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "SELL")
-						if (retcode != SUCCESS) then
-							continue
-						endif
-						ThisOrderState = "CloseLong"
-					else
-						dump_table(DB_GROUP, "Inconsisten Position Type")
-						return DB_GROUP_INCONSISTENT_STATE
-					endif
-					
-				else
-					dump_table(DB_NEW_ORDER_TABLE, "Inconsisten Order Action for symbol " + symbol)
-					return DB_NEW_ORDER_TABLE_INCONSISTENT_STATE
-				endif
-
-			else
-				# order to buy "A" whereas we have "B" 
-				# we need to liquidate "B" first and then wait for this order to be filled
-				if ((sym_A == TRUE && pair_position_type == 'B') OR
-				   (sym_B == TRUE && pair_position_type == 'A')) then
-					new_symbol = (sym_A == TRUE) ? ENTRY_DB_GROUP.Symbol_B : ENTRY_DB_GROUP.Symbol_A
-					new_action = (sym_A == TRUE) ? get_flip_action(ENTRY_DB_GROUP.Position_HoldingType_B ): get_flip_action(ENTRY_DB_GROUP.Position_HoldingType_A)
-					new_ordertype = get_default_order_type()
-					auto_generated_randomID =  generate_unique_randomid()
-					SM3_ENTRY_DB_NEW_ORDER_TABLE = new DB_NEW_ORDER_TABLE(auto_generated_randomID)
-					SM3_ENTRY_DB_NEW_ORDER_TABLE.group_number = ENTRY_DB_GROUP.group_number
-					SM3_ENTRY_DB_NEW_ORDER_TABLE.symbol = new_symbol
-					SM3_ENTRY_DB_NEW_ORDER_TABLE.action = new_action
-					SM3_ENTRY_DB_NEW_ORDER_TABLE.orderType = new_ordertype
-					SM3_ENTRY_DB_NEW_ORDER_TABLE.signalPrice = get_current_price(new_symbol)
-					SM3_ENTRY_DB_NEW_ORDER_TABLE.signalTime = TIME()
-					SM3_ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Initialized"
-					SM3_ENTRY_DB_NEW_ORDER_TABLE.exchange = (sym_A == TRUE) ? ENTRY_DB_GROUP.Exchange_B : ENTRY_DB_GROUP.Exchange_A
-					SM3_ENTRY_DB_NEW_ORDER_TABLE.secType = (sym_A == TRUE) ? ENTRY_DB_GROUP.SecType_B : ENTRY_DB_GROUP.SecType_A
-					SM3_ENTRY_DB_NEW_ORDER_TABLE.currency = (sym_A == TRUE) ? ENTRY_DB_GROUP.Currency_B : ENTRY_DB_GROUP.Currency_A
-					SAVE(DB_NEW_ORDER_TABLE, SM3_ENTRY_DB_NEW_ORDER_TABLE)
-					#ReRead the table - get the newly saved entry, to get the guaranted order_number
-					SM3_ENTRY_DB_NEW_ORDER_TABLE =  DB_NEW_ORDER_TABLE.auto_generated_randomID == auto_generated_randomID
-					ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "OnHold"
-					ENTRY_DB_GROUP.PendingHoldOrderNumber = SM3_ENTRY_DB_NEW_ORDER_TABLE.order_number 
-					ENTRY_DB_GROUP.PendingHoldIBOrderID = 0
-					ENTRY_DB_NEW_ORDER_TABLE.pending_hold_order_number = SM3_ENTRY_DB_NEW_ORDER_TABLE.order_number
-				endif
-			endif
-				
 		endif
+
+		Current_equity = ENTRY_DB_GROUP.Current_equity
+		
+		if ENTRY_DB_GROUP.Symbol_A == symbol then
+			sym_A = TRUE
+			sym_B = FALSE
+		else
+			sym_B = TRUE
+			sym_A = FALSE
+		endif
+
+
+		# state machine 1 or 2
+		if (pair_position_type == "CASH") OR
+			(sym_A  == TRUE && pair_position_type == 'A') OR
+			(sym_B  == TRUE && pair_position_type == 'B' ) then
+
+			leverage = (sym_A == TRUE) ? ENTRY_DB_GROUP.Leverage_A : ENTRY_DB_GROUP.Leverage_B
+			ok_long = (sym_A == TRUE) ? ENTRY_DB_GROUP.LongAllow_A : ENTRY_DB_GROUP.LongAllow_B
+			ok_short = (sym_A == TRUE) ? ENTRY_DB_GROUP.ShortAllow_A : ENTRY_DB_GROUP.ShortAllow_B
+			ENTRY_DB_NEW_ORDER_TABLE.exchange = (sym_A == TRUE) ? ENTRY_DB_GROUP.Exchange_A : ENTRY_DB_GROUP.Exchange_B
+			ENTRY_DB_NEW_ORDER_TABLE.currency = (sym_A == TRUE) ? ENTRY_DB_GROUP.Currency_A : ENTRY_DB_GROUP.Currency_B
+			ENTRY_DB_NEW_ORDER_TABLE.secType = (sym_A == TRUE) ? ENTRY_DB_GROUP.SecType_A : ENTRY_DB_GROUP.SecType_B
+			ENTRY_DB_NEW_ORDER_TABLE.pair_position_type = (sym_A == TRUE) ? "A" : "B"
+			sharesholding = (sym_A == TRUE) ? ENTRY_DB_GROUP.Shares_Filled_A : ENTRY_DB_GROUP.Shares_Filled_B
+
+			if (pair_position_type == "CASH")
+				Position_HoldingType = "NONE"
+			else
+				Position_HoldingType = (sym_A == TRUE) ? ENTRY_DB_GROUP.Position_HoldingType_A : ENTRY_DB_GROUP.Position_HoldingType_B
+			endif
+
+			if (orderAction == "BUY") then
+
+				if (Position_HoldingType == "NONE" || Position_HoldingType == "LONG") then
+					if (Position_HoldingType == "NONE" AND ok_long == FALSE) then
+						LOG_MESSAGE(ENTRY_DB_NEW_ORDER_TABLE, "LongNotAllowed for " + symbol
+						DELETE(DB_NEW_ORDER_TABLE, ENTRY_DB_NEW_ORDER_TABLE)
+						continue
+					endif
+					if (NotTradeableEquity(Current_equity)) then
+						ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Invalid"
+						if (Position_HoldingType == "NONE") then
+							ENTRY_DB_GROUP.DONT_TRADE = TRUE
+							ENTRY_DB_GROUP.PAIR_POSITION_TYPE = "BUSTED"
+							LOG_MESSAGE(ENTRY_DB_GROUP, "Ran out of money")
+						else
+							LOG_MESSAGE(ENTRY_DB_GROUP, "Can not add long positions for " + symbol)
+						endif
+						continue
+					endif
+
+					ENTRY_DB_NEW_ORDER_TABLE.currentPrice = get_current_price(symbol)
+					sharestotrade = get_shares_quantity(symbol, leverage, Current_equity, ENTRY_DB_NEW_ORDER_TABLE.currentPrice)
+					if (sym_A == TRUE)
+						ENTRY_DB_GROUP.Shares_Requested_A = sharestotrade
+					else
+						ENTRY_DB_GROUP.Shares_Requested_B = sharestotrade
+					retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "LONG")
+					if (retcode != SUCCESS) then
+						continue
+					endif
+					ThisOrderState = "OpenLong"
+
+				else if (Position_HoldingType == "SHORT") then
+					sharestotrade = sharesholding
+					if (sym_A == TRUE)
+						ENTRY_DB_GROUP.Shares_Requested_A = sharestotrade
+					else
+						ENTRY_DB_GROUP.Shares_Requested_B = sharestotrade
+					retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "LONG")
+					if (retcode != SUCCESS) then
+						continue
+					endif
+					ThisOrderState = "CloseShort"
+				else
+					dump_table(DB_GROUP, "Inconsisten Position Type")
+					return DB_GROUP_INCONSISTENT_STATE
+				endif
+
+			else if (orderAction == "SELL") then
+
+				if (Position_HoldingType == "NONE" || Position_HoldingType == "SHORT") then
+					if (Position_HoldingType == "NONE" AND ok_short == FALSE) then
+						LOG_MESSAGE(ENTRY_DB_NEW_ORDER_TABLE, "ShortNotAllowed for " + symbol)
+						DELETE(DB_NEW_ORDER_TABLE, ENTRY_DB_NEW_ORDER_TABLE)
+						continue
+					endif
+					if (NotTradeableEquity(Current_equity)) then
+						ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Invalid"
+						if (Position_HoldingType == "NONE") then
+							ENTRY_DB_GROUP.DONT_TRADE = TRUE
+							ENTRY_DB_GROUP.PAIR_POSITION_TYPE = "BUSTED"
+							LOG_MESSAGE(ENTRY_DB_GROUP, "Ran out of money")
+						else
+							LOG_MESSAGE(ENTRY_DB_GROUP, "Can not add short positions for " + symbol)
+						endif
+						continue
+					endif
+
+					ENTRY_DB_NEW_ORDER_TABLE.currentPrice = get_current_price(symbol)
+					sharestotrade = get_shares_quantity(symbol, leverage, Current_equity, ENTRY_DB_NEW_ORDER_TABLE.currentPrice)
+					if (sym_A == TRUE)
+						ENTRY_DB_GROUP.Shares_Requested_A = sharestotrade
+					else
+						ENTRY_DB_GROUP.Shares_Requested_B = sharestotrade
+					retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "SELL")
+					if (retcode != SUCCESS) then
+						continue
+					endif
+					ThisOrderState = "OpenShort"
+
+				else if (Position_HoldingType == "Long") then
+					sharestotrade = sharesholding
+					if (sym_A == TRUE)
+						ENTRY_DB_GROUP.Shares_Requested_A = sharestotrade
+					else
+						ENTRY_DB_GROUP.Shares_Requested_B = sharestotrade
+					retcode = CreateOrder(sharestotrade, ENTRY_DB_GROUP, ENTRY_DB_NEW_ORDER_TABLE, "SELL")
+					if (retcode != SUCCESS) then
+						continue
+					endif
+					ThisOrderState = "CloseLong"
+				else
+					dump_table(DB_GROUP, "Inconsisten Position Type")
+					return DB_GROUP_INCONSISTENT_STATE
+				endif
+				
+			else
+				dump_table(DB_NEW_ORDER_TABLE, "Inconsisten Order Action for symbol " + symbol)
+				return DB_NEW_ORDER_TABLE_INCONSISTENT_STATE
+			endif
+
+		else
+			# order to buy "A" whereas we have "B" 
+			# we need to liquidate "B" first and then wait for this order to be filled
+			if ((sym_A == TRUE && pair_position_type == 'B') OR
+			   (sym_B == TRUE && pair_position_type == 'A')) then
+				new_symbol = (sym_A == TRUE) ? ENTRY_DB_GROUP.Symbol_B : ENTRY_DB_GROUP.Symbol_A
+				new_action = (sym_A == TRUE) ? get_flip_action(ENTRY_DB_GROUP.Position_HoldingType_B ): get_flip_action(ENTRY_DB_GROUP.Position_HoldingType_A)
+				new_ordertype = get_default_order_type()
+				auto_generated_randomID =  generate_unique_randomid()
+				SM3_ENTRY_DB_NEW_ORDER_TABLE = new DB_NEW_ORDER_TABLE(auto_generated_randomID)
+				SM3_ENTRY_DB_NEW_ORDER_TABLE.group_number = ENTRY_DB_GROUP.group_number
+				SM3_ENTRY_DB_NEW_ORDER_TABLE.symbol = new_symbol
+				SM3_ENTRY_DB_NEW_ORDER_TABLE.action = new_action
+				SM3_ENTRY_DB_NEW_ORDER_TABLE.orderType = new_ordertype
+				SM3_ENTRY_DB_NEW_ORDER_TABLE.signalPrice = get_current_price(new_symbol)
+				SM3_ENTRY_DB_NEW_ORDER_TABLE.signalTime = TIME()
+				SM3_ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Initialized"
+				SM3_ENTRY_DB_NEW_ORDER_TABLE.exchange = (sym_A == TRUE) ? ENTRY_DB_GROUP.Exchange_B : ENTRY_DB_GROUP.Exchange_A
+				SM3_ENTRY_DB_NEW_ORDER_TABLE.secType = (sym_A == TRUE) ? ENTRY_DB_GROUP.SecType_B : ENTRY_DB_GROUP.SecType_A
+				SM3_ENTRY_DB_NEW_ORDER_TABLE.currency = (sym_A == TRUE) ? ENTRY_DB_GROUP.Currency_B : ENTRY_DB_GROUP.Currency_A
+				SAVE(DB_NEW_ORDER_TABLE, SM3_ENTRY_DB_NEW_ORDER_TABLE)
+				#ReRead the table - get the newly saved entry, to get the guaranted order_number
+				SM3_ENTRY_DB_NEW_ORDER_TABLE =  DB_NEW_ORDER_TABLE.auto_generated_randomID == auto_generated_randomID
+				ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "OnHold"
+				ENTRY_DB_GROUP.PendingHoldOrderNumber = SM3_ENTRY_DB_NEW_ORDER_TABLE.order_number 
+				ENTRY_DB_GROUP.PendingHoldIBOrderID = 0
+				ENTRY_DB_NEW_ORDER_TABLE.pending_hold_order_number = SM3_ENTRY_DB_NEW_ORDER_TABLE.order_number
+			endif
+		endif
+			
 
 	end
 		
@@ -610,7 +612,7 @@ Function CompleteExecutionDBGroup(ENTRY_GET_ALL_EXECUTIONS)
 		endif
 		ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Initialized"
 	endif
-	ENTRY_DB_NEW_ORDER_TABLE =  (DB_NEW_ORDER_TABLE.order_number == ENTRY_DB_GROUP.order_number )
+	ENTRY_DB_NEW_ORDER_TABLE =  (DB_NEW_ORDER_TABLE.order_number == ENTRY_DB_GROUP.CurrentOrderNumber )
 	if ENTRY_DB_NEW_ORDER_TABLE != NULL then
 		ENTRY_DB_NEW_ORDER_TABLE.orderstatus = "Executed"
 	endif
