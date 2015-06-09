@@ -37,3 +37,5 @@ Specify exchange as ISLAND
 Order rejected - reason:The exchange is closed
 ### Solution
 Wait for it to open
+
+createneworder.py -ac DU226708 --trade_forex -sym EUR --long_mkt
