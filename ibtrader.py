@@ -6,23 +6,26 @@ https://pypi.python.org/pypi/swigibpy/0.4.1
 
 import sys
 import argparse
+import numpy as np
 import time
 import json
 from pprint import pprint
 from threading import Event
 
-from swigibpy import (EWrapper, EPosixClientSocket, Contract, Order, TagValue,
+from swigibpy import (EWrapper, EWrapperVerbose, EPosixClientSocket, Contract, Order, TagValue,
                       TagValueList, ExecutionFilter)
 
-
-
-
+debug = False
+tws = None
 try:
-    # Python 2 compatibility
-    input = raw_input
-    from Queue import Queue
+        # Python 2 compatibility
+        input = raw_input
+        from Queue import Queue
 except:
-    from queue import Queue
+        from queue import Queue
+
+
+ERRORS_TO_TRIGGER=[103, 162, 200, 201, 202, 203,  399, 406, 412, 420, 434, 478, 502, 504, 505, 511, 512, 515, 516,  1100, 2105 ]
 
 ###
     
@@ -34,7 +37,15 @@ def print_json_dictword(dictline):
     print "%s, " % json.dumps(dictline)
 
 def print_json_end():
-    print "{\"dummy\" : 0} ] }"
+    global global_errorCode
+    global global_errorString
+    global iserror
+    print "{\"dummy\" : 0} ]"
+    if global_errorCode != 0 and iserror == True:
+       print "\"ErrorMessage\" : [" 
+       print "{\"error_code\" : %d, \"error_message\" : \"%s\"}]" % (global_errorCode, global_errorString)
+       
+    print "}"
 
 def print_dictonary_json(mapkeyword, dictword):
     
@@ -60,6 +71,7 @@ def get_open_orders():
     global iserror
     global order_structure
     global is_request_open_order
+    global tws
     
     iserror=False
     request_finished=False
@@ -77,7 +89,8 @@ def get_open_orders():
         pass
     
     if iserror:
-        raise Exception("Problem getting open orders")
+        pass
+        #raise Exception("Problem getting open orders")
 
     return order_structure    
 
@@ -103,6 +116,7 @@ def get_IB_positions():
     global account_value
     global base_currency_cash
     global debug
+    global tws
 
     request_finished=False
     iserror=False
@@ -147,8 +161,17 @@ def get_IB_positions():
     return (portfolio_structure, exchange_rates, portfolio_holdings, total_cash_balance)
 
        
+def get_contract(symbol, secType, exchange, primaryExchange, currency):
 
-def place_order(symbol, secType, exchange, primaryExchange, currency, action, lmtPrice, orderType, totalQuantity, user_account):
+    contract = Contract()
+    contract.symbol = symbol
+    contract.secType = secType
+    contract.exchange = exchange
+    contract.primaryExchange = primaryExchange
+    contract.currency = currency
+    return contract
+
+def place_order(symbol, secType, exchange, primaryExchange, currency, action, lmtPrice, orderType, totalQuantity, user_account, no_wait_for_complete = True):
 
     global debug
     global order
@@ -156,16 +179,14 @@ def place_order(symbol, secType, exchange, primaryExchange, currency, action, lm
     global args
     global is_placing_order
     global global_errorString
+    global global_errorCode
+    global print_normal_order_placed
+    global tws
 
     is_placing_order = True
     if primaryExchange == '':
        primaryExchange = exchange
-    contract = Contract()
-    contract.symbol = symbol
-    contract.secType = secType
-    contract.exchange = exchange
-    contract.primaryExchange = primaryExchange
-    contract.currency = currency
+    contract = get_contract(symbol, secType, exchange, primaryExchange, currency)
     if debug:
        print("place_order : Contract.symbol = %s secType = %s exchange = %s primaryExchange = %s currency = %s" % (symbol, secType, exchange, primaryExchange, currency))
 
@@ -174,7 +195,8 @@ def place_order(symbol, secType, exchange, primaryExchange, currency, action, lm
     order_id = callback.order_ids.get(timeout=WAIT_TIME)
     if not order_id:
         is_placing_order = False
-        raise RuntimeError('Failed to receive order id after %ds' % WAIT_TIME)
+        return None
+        #raise RuntimeError('Failed to receive order id after %ds' % WAIT_TIME)
 
 
     order = Order()
@@ -197,16 +219,27 @@ def place_order(symbol, secType, exchange, primaryExchange, currency, action, lm
         order                                       # order
     )
 
-    if args.no_wait_for_complete:
+    orderdict=dict(localSymbol=contract.localSymbol,symbol=contract.symbol, expiry=contract.expiry, order_id=order_id, action = action, 
+                   order_type = orderType, exchange = exchange, primaryExchange = primaryExchange, currency = currency, sectype = secType, accountName = user_account, 
+                   quantity =  order.totalQuantity);
+    if no_wait_for_complete:
         time.sleep(2)
         if iserror:
+           orderdict.update({'error_code' : global_errorCode, 'error_message' : global_errorString})
            is_placing_order = False
-           print "Error placing order %d Message = %s Symbol %s Qty %d Limit %d Action %s Type %s  Account %s SecType %s Exchange %s PrimaryExchange %s Currency %s" % (order_id, global_errorString, symbol, order.totalQuantity,  lmtPrice, action, orderType, user_account, secType, exchange, primaryExchange, currency)
+           if print_normal_order_placed == True:
+               print "Error placing order %d Message = %s Symbol %s Qty %d Limit %d Action %s Type %s  Account %s SecType %s Exchange %s PrimaryExchange %s Currency %s" % (order_id, global_errorString, symbol, order.totalQuantity,  lmtPrice, action, orderType, user_account, secType, exchange, primaryExchange, currency)
         else:
-           print "PlacedOrder %d Symbol %s Qty %d Limit %d Action %s Type %s  Account %s SecType %s Exchange %s PrimaryExchange %s Currency %s" % (order_id, symbol, order.totalQuantity,  lmtPrice, action, orderType, user_account, secType, exchange, primaryExchange, currency)
+           orderdict.update({'NotWait' : True})
+           if print_normal_order_placed == True:
+              print "PlacedOrder %d Symbol %s Qty %d Limit %d Action %s Type %s  Account %s SecType %s Exchange %s PrimaryExchange %s Currency %s" % (order_id, symbol, order.totalQuantity,  lmtPrice, action, orderType, user_account, secType, exchange, primaryExchange, currency)
 
         if debug:
             print "Not waiting for order to be completed"
+        if print_normal_order_placed == False:
+            print_json_start("OrderPlaced")
+            print_json_dictword(orderdict)
+            print_json_end()
         return
 
     if debug:
@@ -229,70 +262,147 @@ def place_order(symbol, secType, exchange, primaryExchange, currency, action, lm
        print("\nDisconnecting...")
 
     is_placing_order = False
-    print "%s " % contract.symbol,
-    print "%d " % order.totalQuantity,
-    print "%s " % order.action,
-    print "%s " % order.orderType,
-    print "%d " % order_id,
-    print "%.4f " % avg_price_per_share,
-    print "%d " % total_shares_filled,
-    print "%.2f " % total_comm,
-    print "%s " % account_number
+    if print_normal_order_placed:
+        print "%s " % contract.symbol,
+        print "%d " % order.totalQuantity,
+        print "%s " % order.action,
+        print "%s " % order.orderType,
+        print "%d " % order_id,
+        print "%.4f " % avg_price_per_share,
+        print "%d " % total_shares_filled,
+        print "%.2f " % total_comm,
+        print "%s " % account_number
+    else:
+        print_json_start("OrderPlaced")
+        orderdict.update({'avg_price' : avg_price_per_share, 'total_shares_filled' : total_shares_filled, 'total_commission' : total_comm})
+        print_json_dictword(orderdict)
+        print_json_end()
+
+
+def get_IB_market_data(ibcontract):
+    """
+    Returns more granular market data
+    
+    Returns a tuple (bid price, bid size, ask price, ask size)
+    
+    """
+    
+    global marketdata
+    #global finished
+    global iserror
+    global tws
+    global  MEANINGLESS_ID
+
+
+    finished=False
+    iserror=False
+    
+    ## initialise the tuple
+    if debug:
+        print "init marketdata"
+        print "dir(IBWrapper) ", dir(IBWrapper)
+    marketdata=[np.nan, np.nan, np.nan, np.nan]
+        
+    # Request a market data stream 
+    if debug:
+        print "call tws.reqMktData with MEANINGLESS_ID " , MEANINGLESS_ID
+    rc = tws.reqMktData(
+            MEANINGLESS_ID,
+            ibcontract,
+            "",
+            False, None)       
+    
+    if debug:
+       print "tws.reqMktData - returned ", rc
+    start_time=time.time()
+    if debug:
+        print "calling time.time() for ", str(start_time)
+        print "Calling sleep(1)"
+    time.sleep(2)
+    if debug:
+        print "Done  sleep(1)"
+#        while not finished:
+#            if (time.time() - start_time) > seconds:
+#                finished=True
+#            pass
+    if debug:
+        print "calling self.tws.cancelMktData"
+    tws.cancelMktData(MEANINGLESS_ID)
+    
+    ## marketdata should now contain some interesting information
+    ## Note in this implementation we overwrite the contents with each tick; we could keep them
+    
+    if iserror:
+        pass
+        #raise Exception("Problem getting market data")
+    
+    if debug:
+        print "returning marketdata"
+    quotedict = dict(bidsize=marketdata[0], asksize=marketdata[1], bidprice=marketdata[2], askprice=marketdata[3], symbol=ibcontract.symbol, localsymbol=ibcontract.localSymbol)
+    return quotedict
 
 
 def get_executions():
-	"""
-	Returns a list of all executions done today
-	"""
+
+    """
+    Returns a list of all executions done today
+    """
 
 
-	global request_finished
-	global iserror
-	global execlist
-	global getting_today_executions
+    global request_finished
+    global iserror
+    global debug
+    global execlist
+    global getting_today_executions
+    global tws
 
-	iserror=False
-	request_finished=False
-	execlist=[]
+    iserror=False
+    request_finished=False
+    execlist=[]
 
-	## Tells the wrapper we are getting executions, not expecting fills
-	## Note that if you try and get executions when fills should be coming will be confusing!
-	## BE very careful with fills code
+    ## Tells the wrapper we are getting executions, not expecting fills
+    ## Note that if you try and get executions when fills should be coming will be confusing!
+    ## BE very careful with fills code
 
-	getting_today_executions=True
+    getting_today_executions=True
 
-	start_time=time.time()
+    start_time=time.time()
 
-	## We can change ExecutionFilter to subset different orders
+    ## We can change ExecutionFilter to subset different orders
 
-	tws.reqExecutions(MEANINGLESS_NUMBER, ExecutionFilter())
+    tws.reqExecutions(MEANINGLESS_NUMBER, ExecutionFilter())
 
-	while not request_finished:
-		if (time.time() - start_time) > MAX_WAIT_SECONDS:
-			request_finished=True
-			iserror=True
-		pass
+    while not request_finished:
+            if (time.time() - start_time) > MAX_WAIT_SECONDS:
+                    request_finished=True
+                    iserror=True
+            pass
 
-	## Change this flag back so that the process gets fills properly
-	getting_today_executions=False
+    ## Change this flag back so that the process gets fills properly
+    getting_today_executions=False
 
-	if iserror:
-		raise Exception("Problem getting executions")
+    if iserror:
+            pass
+            #raise Exception("Problem getting executions")
 
-        for key in execlist:
-            execid = key["execid"]
+    for key in execlist:
+        execid = key["execid"]
+        if execid in mycommdetails:
             key["commission"] = mycommdetails[execid]
+        else:
+            if debug:
+               print "No commission YET for execid", execid
 
-	return execlist
+    return execlist
 
-class IBClient(EWrapper):
+class IBWrapper(EWrapper):
     '''Callback object passed to TWS, these functions will be called directly
     by TWS.
 
     '''
 
     def __init__(self):
-        super(IBClient, self).__init__()
+        super(IBWrapper, self).__init__()
         self.order_filled = Event()
         self.order_ids = Queue()
 
@@ -357,17 +467,19 @@ class IBClient(EWrapper):
         global request_finished
         global is_placing_order
         global global_errorString
+        global global_errorCode
+        global ERRORS_TO_TRIGGER
 
         ## Any errors not on this list we just treat as information
-        ERRORS_TO_TRIGGER=[201, 103, 502, 504, 509, 200, 162, 420, 2105, 1100, 478, 201, 399]
         global_errorString = errorString
+        global_errorCode = errorCode
        
         #print "ERROR errorCode = %d errorString = %s" % (errorCode, errorString)
         if errorCode in ERRORS_TO_TRIGGER:
             iserror=True
             errormsg="Code=%d IB error id %d errorcode %d string %s" %(errorCode, id, errorCode, errorString)
-            if is_placing_order == False:
-                print errormsg
+            #if is_placing_order == False:
+            #    print errormsg
             finished=True  
             request_finished=True  
            
@@ -432,6 +544,11 @@ class IBClient(EWrapper):
         global order
         global account_number
         global request_finished
+
+        if getting_today_executions == 0 and order is None:
+           #print "execdetails Open is None"
+           return
+
         num_executions += 1
 
 
@@ -553,7 +670,7 @@ class IBClient(EWrapper):
         ## Get a selection of interesting things about the order
         if debug:
            print 'openOrder Order opened for %s orderID %s ' % (contract.symbol, orderID)
-        if contract.exchange == 'IDEALPRO' and contract.exchange == 'IDEAL':
+        if contract.exchange == 'IDEALPRO' or contract.exchange == 'IDEAL':
            localSymbol = contract.symbol + "." + contract.currency
         else:
            localSymbol = contract.localSymbol
@@ -592,369 +709,567 @@ class IBClient(EWrapper):
                                             total_comm,
                                             commissionReport.realizedPNL)
 
-#prompt = input("WARNING: This example will place an order on your IB "
-#               "account, are you sure? (Type yes to continue): ")
-#if prompt.lower() != 'yes':
-#    sys.exit()
-iserror = False
-request_finished=False
-execlist = []
-getting_today_executions = False
-accountName = "NO_ACCOUNT_NUM"
-partial_avg_price_per_share = 0
-partial_shares_filled = 0
-avg_price_per_share = 0
-total_shares_filled = 0
-is_request_open_order = False
-overridePercentageConstraints = True
 
-mycommdetails = {}
-myexecdetails = {}
-num_executions = 0
-num_commReport = 0
-all_trades_filled = 0
-all_comm_filled = 0
-total_comm = 0
-debug = 0
-#tcp_port = 7496
-tcp_port = 4001
-tws_host = ""
-tws_clientid = 8899
-WAIT_TIME = 300
-MAX_WAIT_SECONDS = 30
-order_structure = []
-MEANINGLESS_NUMBER=1729
-is_placing_order = False
-errormsg = ""
-account_number=""
-base_currency_cash=0
+    def realtimeBar(self, reqId, time, open, high, low, close, volume, wap, count):
 
-# Instantiate our callback object
-callback = IBClient()
+        """
+        Note we don't use all the information here
 
-parser = argparse.ArgumentParser()
-parser.add_argument('-wt', '--wait_time', default='not_a_wait_time', help="Wait time in seconds for completion")
-parser.add_argument('-gw', '--gateway', action='store_true', help="Use gateway tcp port 4001 by default")
-parser.add_argument('-tws', '--tws', action='store_true', help="Use TWS tcp port 7496 by default")
-parser.add_argument('-new', '--new_order', action='store_true', help="Place a new order")
-parser.add_argument('-ts', '--trade_stock', action='store_true', help="Place a stock order [STK,SMART,USD]")
-parser.add_argument('-tf', '--trade_forex', action='store_true', help="Place a forex order [CASH,IDEALPRO,USD]")
-parser.add_argument('-to', '--trade_options', action='store_true', help="Place an options order [OPT,SMART,USD]")
-parser.add_argument('-ll', '--long_lmt', action='store_true', help="Place a Long Limit order")
-parser.add_argument('-lm', '--long_mkt', action='store_true', help="Place a Long Market order")
-parser.add_argument('-sl', '--short_lmt', action='store_true', help="Place a Short Limit order")
-parser.add_argument('-sm', '--short_mkt', action='store_true', help="Place a Short Market order")
-parser.add_argument('-sym', '--symbol', default='not_a_symbol', help="Symbol")
-parser.add_argument('-ot', '--order_secType', default='not_a_secType', help="Security Type [CASH|STK|FUT|OPT|etc]")
-parser.add_argument('-oe', '--order_exchange', default='not_a_exchange', help="Exchange [IDEALPRO|SMART]")
-parser.add_argument('-ope', '--order_primaryexchange', default='not_a_primaryexchange', help="Primary Exchange [IDEALPRO|SMART]")
-parser.add_argument('-oc', '--order_currency', default='not_a_currency', help="Currency USD")
-parser.add_argument('-oa', '--order_action', default='not_a_action', help="Order action BUY|SELL")
-parser.add_argument('-ol', '--order_limit_price', default='not_a_limit_price', help="Limit Price for the order, ignored in case of market order")
-parser.add_argument('-oo', '--order_type', default='not_a_type', help="Order Type LMT|MKT -- can be more")
-parser.add_argument('-oid', '--order_id', default='not_a_order_id', help="Order ID - used to search execution")
-parser.add_argument('-oq', '--order_quantity', default='not_a_quantity', help="Order Quantity")
-parser.add_argument('-pf', '--print_portfolio', action='store_true', help="Print Portfolio")
-parser.add_argument('-pc', '--print_cash', action='store_true', help="Print Cash in Portfolio")
-parser.add_argument('-pp', '--print_positions', action='store_true', help="Print ALL Positions")
-parser.add_argument('-ps', '--print_sym_position', action='store_true', help="Print Position for Symbol")
-parser.add_argument('-pe', '--print_executions', action='store_true', help="Print Executions")
-parser.add_argument('-pse', '--print_sym_executions', action='store_true', help="Print Executions for Symbol")
-parser.add_argument('-pid', '--print_order_id', action='store_true', help="Print Executions By Order ID")
-parser.add_argument('-po', '--print_open_orders', action='store_true', help="Print Open Orders")
-parser.add_argument('-pso', '--print_open_sym_orders', action='store_true', help="Print Open Orders for Symbol")
-parser.add_argument('-d', '--debug', action='store_true', help="Debug enable")
-parser.add_argument('-nod', '--no-debug', action='store_false', help="Debug disable")
-parser.add_argument('-tcp', '--tcp_port', default='not_a_tcp_port', help="Tcp port to use, default is 4001")
-parser.add_argument('-clid', '--tws_clientid', default='not_a_tws_clientid', help="TWS Client ID, default is 8899")
-parser.add_argument('-host', '--tws_host', default='not_a_tws_host', help="host name/address to use, default is localhost")
-parser.add_argument('-cal', '--cancel_all_orders', action='store_true', help="Cancel ALL open orders")
-parser.add_argument('-cso', '--cancel_sym_order', action='store_true', help="Cancel open orders for Symbol")
-parser.add_argument('-clo', '--close_all_positions', action='store_true', help="Close ALL positions")
-parser.add_argument('-cls', '--close_sym_position', action='store_true', help="Close positions for Symbol")
-parser.add_argument('-nw', '--no_wait_for_complete', action='store_true', help="Dont wait for completion, just exit after placing order")
-parser.add_argument('-acnum', '--account_number', default='not_a_account_number', help="Account Number")
+        Just append close prices.
+        """
 
+        global pricevalue
+        global finished
 
-args = parser.parse_args()
-if args.debug:
-    debug = 1
-if debug:
-    print "gateway ", args.gateway
-    print "tws ", args.tws
-    print "new_order ", args.new_order
-    print "wait_time ", args.wait_time
-    print "tcp_port ", args.tcp_port
-    print "tws_host ", args.tws_host
-    print "tws_clientid ", args.tws_clientid
-    print "symbol ", args.symbol
-    print "trade_stock ", args.trade_stock
-    print "trade_forex ", args.trade_forex
-    print "trade_options ", args.trade_options
-    print "order_secType ", args.order_secType
-    print "order_exchange ", args.order_exchange
-    print "order_primaryexchange ", args.order_primaryexchange
-    print "order_currency ", args.order_currency
-    print "order_action ", args.order_action
-    print "order_limit_price ", args.order_limit_price
-    print "order_type ", args.order_type
-    print "order_quantity ", args.order_quantity
-    print "print_portfolio ", args.print_portfolio
-    print "print_cash ", args.print_cash
-    print "print_positions ", args.print_positions
-    print "print_sym_position ", args.print_sym_position
-    print "print_executions ", args.print_executions
-    print "order_id ", args.order_id
-    print "print_order_id ", args.print_order_id
-    print "print_sym_executions ", args.print_sym_executions
-    print "print_open_orders ", args.print_open_orders
-    print "print_open_sym_orders ", args.print_open_sym_orders
-    print "close_all_positions ", args.close_all_positions
-    print "close_sym_position ", args.close_sym_position
-    print "cancel_sym_order ", args.cancel_sym_order
-    print "no_wait_for_complete ", args.no_wait_for_complete
-    print "long_lmt ", args.long_lmt
-    print "long_mkt ", args.long_mkt
-    print "short_lmt ", args.short_lmt
-    print "short_mkt ", args.short_mkt
-    print "account_number ", args.account_number
-    print "debug ", args.debug
+        pricevalue.append(close)
 
-if args.gateway:
-    args.tcp_port = 4001
-
-if args.tws:
-    args.tcp_port = 7496
-
-if args.tcp_port != 'not_a_tcp_port':
-    tcp_port = int(args.tcp_port)
-
-if args.tws_host != 'not_a_tws_host':
-    tws_host = args.tws_host
-
-if args.cancel_sym_order and args.symbol == 'not_a_symbol':
-    print "No symbol provided to cancel an order"
-    sys.exit()
-
-if args.close_sym_position and args.symbol == 'not_a_symbol':
-    print "No symbol provided to close a position"
-    sys.exit()
-
-if args.print_sym_position and args.symbol == 'not_a_symbol':
-    print "No symbol provided to print a position"
-    sys.exit()
-
-# Instantiate a socket object, allowing us to call TWS directly. Pass our
-# callback object so TWS can respond.
-tws = EPosixClientSocket(callback)
-
-if args.tws_clientid != 'not_a_tws_clientid':
-   tws_clientid = int(args.tws_clientid)
-
-if debug:
-   print 'tws_clientid is  ', tws_clientid
-
-
-
-# Connect to tws running on localhost
-if not tws.eConnect(tws_host, tcp_port, tws_clientid):
-    raise RuntimeError('Failed to connect to TWS')
-
-if args.new_order or args.trade_stock or args.trade_forex or args.trade_options:
-
-    if args.symbol == 'not_a_symbol':
-        print "No symbol passed in order"
-        sys.exit()
-
-    if args.trade_stock:
-        args.order_secType = "STK"
-        if args.order_exchange == 'not_a_exchange':
-            args.order_exchange = "SMART"
-        args.order_currency = "USD"
-
-    if args.trade_forex:
-        args.order_secType = "CASH"
-        if args.order_exchange == 'not_a_exchange':
-            args.order_exchange = "IDEALPRO"
-        if args.order_currency == 'not_a_currency':
-            args.order_currency = "USD"
-
-    if args.trade_options:
-        args.order_secType = "OPT"
-        if order_exchange == 'not_a_exchange':
-            args.order_exchange = "SMART"
-        args.order_currency = "USD"
-
-    if args.long_lmt:
-        args.order_action = "BUY"
-        args.order_type = "LMT"
-
-    if args.long_mkt:
-        args.order_action = "BUY"
-        args.order_type = "MKT"
-
-    if args.short_lmt:
-        args.order_action = "SELL"
-        args.order_type = "LMT"
-
-    if args.short_mkt:
-        args.order_action = "SELL"
-        args.order_type = "MKT"
-
-    order_symbol = args.symbol
-    order_secType = args.order_secType
-    order_exchange = args.order_exchange
-    order_primaryexchange = args.order_primaryexchange
-    order_currency = args.order_currency
-    order_action = args.order_action
-    order_limit_price = args.order_limit_price
-    order_type = args.order_type
-    order_quantity = int(args.order_quantity)
-
-    if order_secType == 'not_a_secType':
-        print "No secType passed in order"
-        sys.exit()
-    
-    if order_exchange == 'not_a_exchange':
-        print "No exchange passed in order"
-        sys.exit()
-    
-    if order_currency == 'not_a_currency':
-        order_currency = "USD"
+    def tickString(self, TickerId, field, value):
+        global marketdata
+        global debug
         if debug:
-           print "No currency passed in order, USD assumed"
-    
-    if order_action == 'not_a_action':
-        print "No action passed in order"
-        sys.exit()
-    
-    if order_type == 'not_a_type':
-        print "No order type passed in order"
-        sys.exit()
+            print "tickString TickerId ", TickerId ,  " field ", field , " value ", value
 
-    if order_quantity == 'not_a_quantity':
-        print "No quantity passed in order"
-        sys.exit()
-    
-    if order_limit_price == 'not_a_limit_price':
-       if order_type == 'LMT':
-          print "No limit price passed in order"
-          sys.exit()
-       else:
-          order_limit_price = 0
-    else:
-       order_limit_price = float(args.order_limit_price)
+        ## update string ticks
 
-    if order_primaryexchange == 'not_a_primaryexchange':
-       order_primaryexchange = order_exchange
+        tickType=field
 
-    place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number)
+        if int(tickType)==0:
+            ## bid size
+            marketdata[0]=int(value)
+        elif int(tickType)==3:
+            ## ask size
+            marketdata[1]=int(value)
 
-if args.print_executions or args.print_sym_executions or args.print_order_id:
-   if args.print_order_id and args.order_id == 'not_a_order_id':
-      print 'Order Id not provided'
-      sys.exit()
-
-   myexecutions = get_executions()
-
-   print_json_start("AllTrades")
-   for key in myexecutions:
-       sym = key["symbol"]
-       oid = key["orderid"]
-       if args.print_executions or (args.print_sym_executions and sym == args.symbol) or (args.print_order_id and args.order_id == oid):
-           print_json_dictword(key)
-   print_json_end()
-
-if args.print_portfolio or args.print_positions or args.print_sym_position or args.print_cash:
-    myport = get_IB_positions()
-    if args.print_cash:
-        print base_currency_cash
-        pass
-
-    #portfolio_structure, exchange_rates, portfolio_holdings, total_cash_balance
-    port_struct = myport[0]
-    exch_rates = myport[1]
-    port_holdings = myport[2]
-    total_cb = myport[3]
-    #print "AccountName %s" % account_number
-    if args.print_portfolio:
-        print "\nPositions"
-        print port_struct
-        print "\nExchange Rates"
-        print exch_rates
-        print "\nTotal Cash Balance"
-        for key, val in  total_cb.items():
-            print key, val
-
-    if debug:
-        print "Portfolio Holdings"
-    if args.print_portfolio or args.print_positions or args.print_sym_position:
-        print_json_start("PortfolioHoldings")
-        for key in  port_holdings:
-            if debug:
-               print "Port_Holdings %s" % (key)
-            qty = key["quantity"]
-            sym = key["localSymbol"]
-            if qty != 0 and (args.print_positions or (args.print_sym_position and sym == args.symbol)):
-                print_json_dictword(key)
-        print_json_end()
-
-
-if args.close_all_positions or args.close_sym_position:
-    myport = get_IB_positions()
-    all_positions = myport[2]
-    args.no_wait_for_complete = 1
-    for key in  all_positions:
-        order_localSymbol = key["localSymbol"]
-        order_quantity = key["quantity"]
-        if order_quantity < 0:
-            order_quantity = -order_quantity
-        if order_quantity > 0 and (args.close_all_positions or (args.close_sym_position and args.symbol == order_localSymbol)):
-            if debug:
-                print "Portfolio %s ", key
-            order_symbol = key["symbol"]
-            order_secType = key["secType"]
-            order_exchange = key["exchange"]
-            order_currency = key["currency"]
-            order_action = key["flip_action"]
-            order_type = "MKT"
-            if debug:
-               print "Close order_symbol = %s %s %s %d @ %s order_exchange = %s" % (order_symbol, key, order_action, order_quantity, order_type, order_exchange)
-            order_limit_price = 0
-            if order_exchange == '':
-               order_exchange = get_order_exchange(order_symbol, order_secType, order_currency)
-            order_primaryexchange = order_exchange
-            place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, accountName)
-#24 {'orderid': 24L, 'exchange': 'IDEALPRO', 'secType': 'CASH', 'orderType': 'LMT', 'primaryExchange': '', 'clientid': 8899L, 'qty': 100000, 'currency': 'USD', 'contract': <swigibpy.Contract; proxy of <Swig Object of type 'Contract *' at 0x7fb0883a2480> >, 'action': 'BUY', 'expiry': '', 'symbol': 'EUR', 'quantity': 100000L, 'side': 'BUY'}
-if args.print_open_orders or args.cancel_all_orders or args.cancel_sym_order or args.print_open_sym_orders:
-    openorders = get_open_orders()
-    if debug:
-        print "Active orders: (should just be limit order)"
-    if args.print_open_orders or args.print_open_sym_orders:
-       print_json_start("OpenOrders")
-    if args.cancel_all_orders or args.cancel_sym_order:
-       print_json_start("CancelOrders")
-    for key in openorders:
-        localSymbol = key["localSymbol"]
-        orderid = key["orderid"]
-        #print "args.symbol is ", args.symbol
-	if args.symbol == 'not_a_symbol' or args.symbol == localSymbol:
-           print_json_dictword(key)
-        #if args.print_open_orders:
-#        print "%d %s %s %s %s %s %s %s %s %s %s " % (key, sym, val["localSymbol"], val["orderState_status"], val["secType"], val["action"], val["orderType"], val["qty"], val["limitPrice"], val["currency"], val["exchange"])
+        elif int(tickType)==1:
+            ## bid
+            marketdata[0][2]=float(value)
+        elif int(tickType)==2:
+            ## ask
+            marketdata[0][3]=float(value)
         
-        if args.cancel_all_orders or (args.cancel_sym_order and args.symbol == localSymbol):
-            if debug:
-                print "Cancel order id %d symbol = %s" %  (key, sym)
-            tws.cancelOrder(orderid)
 
-    if args.cancel_all_orders:
-        if debug:
-           print "Waiting for cancellation to finish"
-        while any_open_orders():
-          pass
-        if debug:
-           print "All orders canceled"
-    print_json_end()
 
-tws.eDisconnect()
+    def tickGeneric(self, TickerId, tickType, value):
+        global marketdata
+
+        ## update generic ticks
+        global debug
+        if debug:
+            print "tickGeneric TickerId ", TickerId ,  " tickType ", tickType, " value ", value
+
+        if int(tickType)==0:
+            ## bid size
+            marketdata[0]=int(value)
+        elif int(tickType)==3:
+            ## ask size
+            marketdata[1]=int(value)
+
+        elif int(tickType)==1:
+            ## bid
+            marketdata[2]=float(value)
+        elif int(tickType)==2:
+            ## ask
+            marketdata[3]=float(value)
+        
+        
+          
+    def tickSize(self, TickerId, tickType, size):
+        
+        ## update ticks of the form new size
+        
+        global marketdata
+        global debug
+        if debug:
+            print "tickSize TickerId ", TickerId ,  " tickType ", tickType, " size ", size
+
+        
+        if int(tickType)==0:
+            ## bid
+            marketdata[0]=int(size)
+        elif int(tickType)==3:
+            ## ask
+            marketdata[1]=int(size)
+        
+
+   
+    def tickSnapshotEnd(self, tickerId):
+        global finished
+        finished=True
+
+    def tickPrice(self, TickerId, tickType, price, canAutoExecute):
+        ## update ticks of the form new price
+        
+        global marketdata
+        global debug
+        
+        if debug:
+           print "tickPrice TickerId ", TickerId , " tickType ", tickType , " price ", price , " canAutoExecute ", canAutoExecute
+        if int(tickType)==1:
+            ## bid
+            marketdata[2]=float(price)
+        elif int(tickType)==2:
+            ## ask
+            marketdata[3]=float(price)
+        
+
+
+
+def main_function(args_to_parse):
+        global tws
+
+	global  iserror
+	global  request_finished
+	global  execlist
+	global  getting_today_executions
+	global  accountName
+	global  partial_avg_price_per_share
+	global  partial_shares_filled
+	global  avg_price_per_share
+	global  total_shares_filled
+	global  is_request_open_order
+	global  overridePercentageConstraints
+	global  global_errorCode
+	global  mycommdetails
+	global  myexecdetails
+	global  num_executions
+	global  num_commReport
+	global  all_trades_filled
+	global  all_comm_filled
+	global  total_comm
+	global  debug
+	global  tcp_port
+	global  tws_host
+	global  tws_clientid
+	global  WAIT_TIME
+	global  MAX_WAIT_SECONDS
+	global  order_structure
+	global  MEANINGLESS_NUMBER
+	global  is_placing_order
+	global  print_normal_order_placed
+	global  errormsg
+	global  account_number
+	global  base_currency_cash
+	global  MEANINGLESS_ID
+	global  marketdata
+	global  order
+	global  callback
+
+
+
+	#prompt = input("WARNING: This example will place an order on your IB "
+	#               "account, are you sure? (Type yes to continue): ")
+	#if prompt.lower() != 'yes':
+	#    return
+
+	iserror = False
+	request_finished=False
+	execlist = []
+	getting_today_executions = False
+	accountName = "NO_ACCOUNT_NUM"
+	partial_avg_price_per_share = 0
+	partial_shares_filled = 0
+	avg_price_per_share = 0
+	total_shares_filled = 0
+	is_request_open_order = False
+	overridePercentageConstraints = True
+	global_errorCode = 0
+
+	mycommdetails = {}
+	myexecdetails = {}
+	num_executions = 0
+	num_commReport = 0
+	all_trades_filled = 0
+	all_comm_filled = 0
+	total_comm = 0
+	debug = False
+	#tcp_port = 7496
+	tcp_port = 4001
+	tws_host = ""
+	tws_clientid = 8899
+	WAIT_TIME = 300
+	MAX_WAIT_SECONDS = 30
+	order_structure = []
+	MEANINGLESS_NUMBER=1729
+	is_placing_order = False
+	print_normal_order_placed = False
+	errormsg = ""
+	account_number=""
+	base_currency_cash=0
+	MEANINGLESS_ID=502
+	marketdata = ""
+	order = None
+
+	# Instantiate our callback object
+	callback = IBWrapper()
+
+	parser = argparse.ArgumentParser()
+	parser.add_argument('-qt', '--quote', action='store_true', help="Get quote for the symbol")
+	parser.add_argument('-wt', '--wait_time', default='not_a_wait_time', help="Wait time in seconds for completion")
+	parser.add_argument('-gw', '--gateway', action='store_true', help="Use gateway tcp port 4001 by default")
+	parser.add_argument('-tws', '--tws', action='store_true', help="Use TWS tcp port 7496 by default")
+	parser.add_argument('-new', '--new_order', action='store_true', help="Place a new order")
+	parser.add_argument('-ts', '--trade_stock', action='store_true', help="Place a stock order [STK,SMART,USD]")
+	parser.add_argument('-tf', '--trade_forex', action='store_true', help="Place a forex order [CASH,IDEALPRO,USD]")
+	parser.add_argument('-to', '--trade_options', action='store_true', help="Place an options order [OPT,SMART,USD]")
+	parser.add_argument('-ll', '--long_lmt', action='store_true', help="Place a Long Limit order")
+	parser.add_argument('-lm', '--long_mkt', action='store_true', help="Place a Long Market order")
+	parser.add_argument('-sl', '--short_lmt', action='store_true', help="Place a Short Limit order")
+	parser.add_argument('-sm', '--short_mkt', action='store_true', help="Place a Short Market order")
+	parser.add_argument('-sym', '--symbol', default='not_a_symbol', help="Symbol")
+	parser.add_argument('-ot', '--order_secType', default='not_a_secType', help="Security Type [CASH|STK|FUT|OPT|etc]")
+	parser.add_argument('-oe', '--order_exchange', default='not_a_exchange', help="Exchange [IDEALPRO|SMART]")
+	parser.add_argument('-ope', '--order_primaryexchange', default='not_a_primaryexchange', help="Primary Exchange [IDEALPRO|SMART]")
+	parser.add_argument('-oc', '--order_currency', default='not_a_currency', help="Currency USD")
+	parser.add_argument('-oa', '--order_action', default='not_a_action', help="Order action BUY|SELL")
+	parser.add_argument('-ol', '--order_limit_price', default='not_a_limit_price', help="Limit Price for the order, ignored in case of market order")
+	parser.add_argument('-oo', '--order_type', default='not_a_type', help="Order Type LMT|MKT -- can be more")
+	parser.add_argument('-oid', '--order_id', default='not_a_order_id', help="Order ID - used to search execution")
+	parser.add_argument('-oq', '--order_quantity', default='not_a_quantity', help="Order Quantity")
+	parser.add_argument('-pf', '--print_portfolio', action='store_true', help="Print Portfolio")
+	parser.add_argument('-pc', '--print_cash', action='store_true', help="Print Cash in Portfolio")
+	parser.add_argument('-pp', '--print_positions', action='store_true', help="Print ALL Positions")
+	parser.add_argument('-ps', '--print_sym_position', action='store_true', help="Print Position for Symbol")
+	parser.add_argument('-pe', '--print_executions', action='store_true', help="Print Executions")
+	parser.add_argument('-pse', '--print_sym_executions', action='store_true', help="Print Executions for Symbol")
+	parser.add_argument('-pid', '--print_order_id', action='store_true', help="Print Executions By Order ID")
+	parser.add_argument('-po', '--print_open_orders', action='store_true', help="Print Open Orders")
+	parser.add_argument('-pso', '--print_open_sym_orders', action='store_true', help="Print Open Orders for Symbol")
+	parser.add_argument('-d', '--debug', action='store_true', help="Debug enable")
+	parser.add_argument('-nod', '--no-debug', action='store_false', help="Debug disable")
+	parser.add_argument('-tcp', '--tcp_port', default='not_a_tcp_port', help="Tcp port to use, default is 4001")
+	parser.add_argument('-clid', '--tws_clientid', default='not_a_tws_clientid', help="TWS Client ID, default is 8899")
+	parser.add_argument('-host', '--tws_host', default='not_a_tws_host', help="host name/address to use, default is localhost")
+	parser.add_argument('-cal', '--cancel_all_orders', action='store_true', help="Cancel ALL open orders")
+	parser.add_argument('-cso', '--cancel_sym_order', action='store_true', help="Cancel open orders for Symbol")
+	parser.add_argument('-cid', '--cancel_orderid', default='not_a_cancel_orderid', help="Cancel IB order id")
+	parser.add_argument('-clo', '--close_all_positions', action='store_true', help="Close ALL positions")
+	parser.add_argument('-cls', '--close_sym_position', action='store_true', help="Close positions for Symbol")
+	parser.add_argument('-nw', '--no_wait_for_complete', action='store_true', help="Dont wait for completion, just exit after placing order")
+	parser.add_argument('-acnum', '--account_number', default='not_a_account_number', help="Account Number")
+
+
+	args = parser.parse_args(args_to_parse)
+	if args.debug:
+		debug = 1
+	if debug:
+		print "gateway ", args.gateway
+		print "tws ", args.tws
+		print "new_order ", args.new_order
+		print "wait_time ", args.wait_time
+		print "tcp_port ", args.tcp_port
+		print "tws_host ", args.tws_host
+		print "tws_clientid ", args.tws_clientid
+		print "symbol ", args.symbol
+		print "trade_stock ", args.trade_stock
+		print "trade_forex ", args.trade_forex
+		print "trade_options ", args.trade_options
+		print "order_secType ", args.order_secType
+		print "order_exchange ", args.order_exchange
+		print "order_primaryexchange ", args.order_primaryexchange
+		print "order_currency ", args.order_currency
+		print "order_action ", args.order_action
+		print "order_limit_price ", args.order_limit_price
+		print "order_type ", args.order_type
+		print "order_quantity ", args.order_quantity
+		print "print_portfolio ", args.print_portfolio
+		print "print_cash ", args.print_cash
+		print "print_positions ", args.print_positions
+		print "print_sym_position ", args.print_sym_position
+		print "print_executions ", args.print_executions
+		print "order_id ", args.order_id
+		print "print_order_id ", args.print_order_id
+		print "print_sym_executions ", args.print_sym_executions
+		print "print_open_orders ", args.print_open_orders
+		print "print_open_sym_orders ", args.print_open_sym_orders
+		print "close_all_positions ", args.close_all_positions
+		print "close_sym_position ", args.close_sym_position
+		print "cancel_sym_order ", args.cancel_sym_order
+		print "cancel_all_orders ", args.cancel_all_orders
+		print "cancel_orderid ", args.cancel_orderid
+		print "no_wait_for_complete ", args.no_wait_for_complete
+		print "long_lmt ", args.long_lmt
+		print "long_mkt ", args.long_mkt
+		print "short_lmt ", args.short_lmt
+		print "short_mkt ", args.short_mkt
+		print "account_number ", args.account_number
+		print "quote ", args.quote
+		print "debug ", args.debug
+
+	if args.wait_time != 'not_a_wait_time':
+	   WAIT_TIME = int(args.wait_time)
+
+	if args.gateway:
+		args.tcp_port = 4001
+
+	if args.tws:
+		args.tcp_port = 7496
+
+	if args.tcp_port != 'not_a_tcp_port':
+		tcp_port = int(args.tcp_port)
+
+	if args.tws_host != 'not_a_tws_host':
+		tws_host = args.tws_host
+
+	if args.cancel_sym_order and args.symbol == 'not_a_symbol':
+		print "No symbol provided to cancel an order"
+		return
+
+	if args.close_sym_position and args.symbol == 'not_a_symbol':
+		print "No symbol provided to close a position"
+		return
+
+	if args.print_sym_position and args.symbol == 'not_a_symbol':
+		print "No symbol provided to print a position"
+		return
+
+	# Instantiate a socket object, allowing us to call TWS directly. Pass our
+	# callback object so TWS can respond.
+	tws = EPosixClientSocket(callback, reconnect_auto=True)
+
+	if args.tws_clientid != 'not_a_tws_clientid':
+	   tws_clientid = int(args.tws_clientid)
+
+	if debug:
+	   print 'tws_clientid is  ', tws_clientid
+
+
+
+	# Connect to tws running on localhost
+	if not tws.eConnect(tws_host, tcp_port, tws_clientid):
+		raise RuntimeError('Failed to connect to TWS')
+
+
+	if args.trade_stock:
+		args.order_secType = "STK"
+		if args.order_exchange == 'not_a_exchange':
+			args.order_exchange = "SMART"
+		args.order_currency = "USD"
+
+	if args.trade_forex:
+		args.order_secType = "CASH"
+		if args.order_exchange == 'not_a_exchange':
+			args.order_exchange = "IDEALPRO"
+		if args.order_currency == 'not_a_currency':
+			args.order_currency = "USD"
+
+	if args.trade_options:
+		args.order_secType = "OPT"
+		if order_exchange == 'not_a_exchange':
+			args.order_exchange = "SMART"
+		args.order_currency = "USD"
+
+	if args.quote:
+	   if args.symbol == 'not_a_symbol':
+		  print "No symbol passed for quote"
+		  return
+	   ibcontract = get_contract(args.symbol, args.order_secType, args.order_exchange, args.order_exchange, args.order_currency)
+           if args.order_exchange == 'IDEALPRO' or args.order_exchange == 'IDEAL':
+              ibcontract.localSymbol = args.symbol + "." + args.order_currency
+           else:
+              ibcontract.localSymbol = args.symbol
+           #ibcontract = Contract()
+           #ibcontract.secType = "CASH"
+           #ibcontract.symbol="EUR"
+           #ibcontract.exchange="IDEALPRO"
+           #ibcontract.currency = "USD"
+	   ans = get_IB_market_data(ibcontract)
+           print_json_start("Quotes")
+           print_json_dictword(ans)
+           print_json_end()
+
+           return
+	   
+
+	if args.cancel_orderid != 'not_a_cancel_orderid':
+	   orderid = int(args.cancel_orderid)
+	   if orderid != 0 and orderid is not None:
+		  tws.cancelOrder(orderid)
+
+	if args.new_order or args.trade_stock or args.trade_forex or args.trade_options:
+
+		if args.symbol == 'not_a_symbol':
+			print "No symbol passed in order"
+			return
+
+		if args.long_lmt:
+			args.order_action = "BUY"
+			args.order_type = "LMT"
+
+		if args.long_mkt:
+			args.order_action = "BUY"
+			args.order_type = "MKT"
+
+                if args.order_quantity == 'not_a_quantity':
+                   print "No quantity specified"
+                   return
+
+		if args.short_lmt:
+			args.order_action = "SELL"
+			args.order_type = "LMT"
+
+		if args.short_mkt:
+			args.order_action = "SELL"
+			args.order_type = "MKT"
+
+
+		order_symbol = args.symbol
+		order_secType = args.order_secType
+		order_exchange = args.order_exchange
+		order_primaryexchange = args.order_primaryexchange
+		order_currency = args.order_currency
+		order_action = args.order_action
+		order_limit_price = args.order_limit_price
+		order_type = args.order_type
+
+		order_quantity = int(args.order_quantity)
+
+		if order_secType == 'not_a_secType':
+			print "No secType passed in order"
+			return
+		
+		if order_exchange == 'not_a_exchange':
+			print "No exchange passed in order"
+			return
+		
+		if order_currency == 'not_a_currency':
+			order_currency = "USD"
+			if debug:
+			   print "No currency passed in order, USD assumed"
+		
+		if order_action == 'not_a_action':
+			print "No action passed in order"
+			return
+		
+		if order_type == 'not_a_type':
+			print "No order type passed in order"
+			return
+
+		if order_quantity == 'not_a_quantity':
+			print "No quantity passed in order"
+			return
+		
+		if order_limit_price == 'not_a_limit_price':
+		   if order_type == 'LMT':
+			  print "No limit price passed in order"
+			  return
+		   else:
+			  order_limit_price = 0
+		else:
+		   order_limit_price = float(args.order_limit_price)
+
+		if order_primaryexchange == 'not_a_primaryexchange':
+		   order_primaryexchange = order_exchange
+
+		place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number, True)
+
+	if args.print_executions or args.print_sym_executions or args.print_order_id:
+	   if args.print_order_id and args.order_id == 'not_a_order_id':
+		  print 'Order Id not provided'
+		  return
+
+	   myexecutions = get_executions()
+
+	   print_json_start("AllTrades")
+	   for key in myexecutions:
+		   sym = key["symbol"]
+		   oid = key["orderid"]
+		   if args.print_executions or (args.print_sym_executions and sym == args.symbol) or (args.print_order_id and args.order_id == oid):
+			   print_json_dictword(key)
+	   print_json_end()
+
+	if args.print_portfolio or args.print_positions or args.print_sym_position or args.print_cash:
+		myport = get_IB_positions()
+		if args.print_cash:
+			print base_currency_cash
+			pass
+
+		#portfolio_structure, exchange_rates, portfolio_holdings, total_cash_balance
+		port_struct = myport[0]
+		exch_rates = myport[1]
+		port_holdings = myport[2]
+		total_cb = myport[3]
+		#print "AccountName %s" % account_number
+		if args.print_portfolio:
+			print "\nPositions"
+			print port_struct
+			print "\nExchange Rates"
+			print exch_rates
+			print "\nTotal Cash Balance"
+			for key, val in  total_cb.items():
+				print key, val
+
+		if debug:
+			print "Portfolio Holdings"
+		if args.print_portfolio or args.print_positions or args.print_sym_position:
+			print_json_start("PortfolioHoldings")
+			for key in  port_holdings:
+				if debug:
+				   print "Port_Holdings %s" % (key)
+				qty = key["quantity"]
+				sym = key["localSymbol"]
+				if qty != 0 and (args.print_positions or (args.print_sym_position and sym == args.symbol)):
+					print_json_dictword(key)
+			print_json_end()
+
+
+	if args.close_all_positions or args.close_sym_position:
+		myport = get_IB_positions()
+		all_positions = myport[2]
+		args.no_wait_for_complete = 1
+		for key in  all_positions:
+			order_localSymbol = key["localSymbol"]
+			order_quantity = key["quantity"]
+			if order_quantity < 0:
+				order_quantity = -order_quantity
+			if order_quantity > 0 and (args.close_all_positions or (args.close_sym_position and args.symbol == order_localSymbol)):
+				if debug:
+					print "Portfolio %s ", key
+				order_symbol = key["symbol"]
+				order_secType = key["secType"]
+				order_exchange = key["exchange"]
+				order_currency = key["currency"]
+				order_action = key["flip_action"]
+				order_type = "MKT"
+				if debug:
+				   print "Close order_symbol = %s %s %s %d @ %s order_exchange = %s" % (order_symbol, key, order_action, order_quantity, order_type, order_exchange)
+				order_limit_price = 0
+				if order_exchange == '':
+				   order_exchange = get_order_exchange(order_symbol, order_secType, order_currency)
+				order_primaryexchange = order_exchange
+				place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, accountName, True)
+	#24 {'orderid': 24L, 'exchange': 'IDEALPRO', 'secType': 'CASH', 'orderType': 'LMT', 'primaryExchange': '', 'clientid': 8899L, 'qty': 100000, 'currency': 'USD', 'contract': <swigibpy.Contract; proxy of <Swig Object of type 'Contract *' at 0x7fb0883a2480> >, 'action': 'BUY', 'expiry': '', 'symbol': 'EUR', 'quantity': 100000L, 'side': 'BUY'}
+	if args.print_open_orders or args.cancel_all_orders or args.cancel_sym_order or args.print_open_sym_orders:
+		openorders = get_open_orders()
+		if debug:
+			print "Active orders: (should just be limit order)"
+		if args.print_open_orders or args.print_open_sym_orders:
+		   print_json_start("OpenOrders")
+		if args.cancel_all_orders or args.cancel_sym_order:
+		   print_json_start("CancelOrders")
+		for key in openorders:
+			localSymbol = key["localSymbol"]
+			orderid = key["orderid"]
+			#print "args.symbol is ", args.symbol
+                        if args.symbol == 'not_a_symbol' or args.symbol == localSymbol:
+                                print_json_dictword(key)
+			#if args.print_open_orders:
+	#        print "%d %s %s %s %s %s %s %s %s %s %s " % (key, sym, val["localSymbol"], val["orderState_status"], val["secType"], val["action"], val["orderType"], val["qty"], val["limitPrice"], val["currency"], val["exchange"])
+			
+			if args.cancel_all_orders or (args.cancel_sym_order and args.symbol == localSymbol):
+				if debug:
+					print "Cancel order id %d symbol = %s" %  (key, sym)
+				tws.cancelOrder(orderid)
+
+                if args.cancel_all_orders:
+			if debug:
+			   print "Waiting for cancellation to finish"
+			while any_open_orders():
+			  pass
+			if debug:
+			   print "All orders canceled"
+		print_json_end()
+
+	tws.eDisconnect()
+
+if __name__ == '__main__':
+   main_function(sys.argv[1:])
