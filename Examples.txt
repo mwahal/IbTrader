@@ -14,13 +14,16 @@ Close Position for EUR
 Sleep 5
 Print Positions
 
+createneworder.py -ac DU226708 --trade_stock -sym UVXY --long_mkt
 
+ibtrader.py -tcp 4002 -host 192.168.123.4 -clid 9900 -qt -sym VXX -oe SMART -oc USD -ot STK
+ibtrader.py -tcp 4002 -host 192.168.123.4 -clid 9900 -qt -sym EUR -oe IDEALPRO -oc USD -ot CASH
 
-python ibtrader.py -tcp 4002 -host 192.168.123.4 -pp
+python ibtrader.py -clid 9900 -tcp 4002 -host 192.168.123.4 -pp
 
-python ibtrader.py -tcp 4002 -host 192.168.123.4 --trade_forex --long_mkt -sym EUR -oq 2500000 -nw -acnum ACNUM
+python ibtrader.py -clid 9900 -tcp 4002 -host 192.168.123.4 --trade_forex --long_mkt -sym EUR -oq 2500000 -nw -acnum ACNUM
 
-python ibtrader.py -tcp 4002 -host 192.168.123.4 --trade_forex --long_lmt -sym EUR -oq 100000 -nw -acnum ACNUM -ol 1.0
+python ibtrader.py -clid 9900 -tcp 4002 -host 192.168.123.4 --trade_forex --long_lmt -sym EUR -oq 100000 -nw -acnum ACNUM -ol 1.0
 
 
 runeff -addts -fromall -sclbw -sclw -do_loess -scale_bandwidth_mult 1 -sdev 0.50 -use_short_sdev -autobw -autobarmulti 1 -shortperiod 0   -tick XIV_QQ   -fromdate 20130101 -slippage 0  -use_this_flds 30 -nef -mkcr OOO -maxlosspcnt -4 -okshort -skipbsma 30 -SKIPBS_MA_CPNT 0.01 -min_holding_minutes 0 -lev 1 -minutes 10
