@@ -153,6 +153,8 @@ class IBWrapper(EWrapper):
         self.order_ids = Queue()
         self.handle_ibtrader = handle_ibtrader
 
+    def connectionClosed(self):
+        print "IBWrapper Connection Closed called"
 
     def currentTime(self, timevalue):
         if self.handle_ibtrader.debug:
@@ -253,7 +255,7 @@ class IBWrapper(EWrapper):
         self.handle_ibtrader.request_finished=True
         self.handle_ibtrader.accountName = accountName
         if self.handle_ibtrader.debug:
-           print "accountDownloadEnd accountName = %s" , self.handle_ibtrader.accountName
+           print "accountDownloadEnd accountName = %s" % self.handle_ibtrader.accountName
 
     def updateAccountTime(self, timeStamp):
         pass 
@@ -325,7 +327,7 @@ class IBWrapper(EWrapper):
            self.handle_ibtrader.partial_avg_price_per_share = execution.avgPrice
            self.handle_ibtrader.partial_shares_filled = execution.cumQty
            self.handle_ibtrader.myexecdetails[execution.execId] = execution
-           if self.handle_ibtrader.order.totalQuantity == execution.cumQty:
+           if self.handle_ibtrader.order and self.handle_ibtrader.order.totalQuantity == execution.cumQty:
               self.handle_ibtrader.all_trades_filled = 1
            if self.handle_ibtrader.all_comm_filled and ((self.handle_ibtrader.order.totalQuantity == execution.cumQty) or self.handle_ibtrader.request_finished):
               if self.handle_ibtrader.debug:
@@ -351,7 +353,10 @@ class IBWrapper(EWrapper):
         """
         No more orders to look at if execution details requested
         """
-        self.handle_ibtrader.request_finished=True
+        if self.handle_ibtrader.ok_wait_all_comm and self.handle_ibtrader.getting_today_executions == 1:
+           self.handle_ibtrader.wait_for_commission_reports_to_finish = True
+        else:
+           self.handle_ibtrader.request_finished=True
         if self.handle_ibtrader.debug:
            print "execDetailsEnd for reqId = %d" % reqId
 
@@ -413,11 +418,15 @@ class IBWrapper(EWrapper):
         self.handle_ibtrader.num_commReport += 1
         self.handle_ibtrader.total_comm += commissionReport.commission
         self.handle_ibtrader.mycommdetails[commissionReport.execId] = commissionReport.commission
+        execid = commissionReport.execId
         if self.handle_ibtrader.debug:
-           print "all_trades_filled = %d num_commReport = %d num_executions %d" % (self.handle_ibtrader.all_trades_filled, self.handle_ibtrader.num_commReport, self.handle_ibtrader.num_executions)
+           print "all_trades_filled = %d num_commReport = %d num_executions %d execid = %s" % (self.handle_ibtrader.all_trades_filled, self.handle_ibtrader.num_commReport, self.handle_ibtrader.num_executions, execid)
         if (self.handle_ibtrader.all_trades_filled == 1 and self.handle_ibtrader.num_commReport == self.handle_ibtrader.num_executions) or self.handle_ibtrader.request_finished:
+           if self.handle_ibtrader.ok_wait_all_comm and self.handle_ibtrader.wait_for_commission_reports_to_finish:
+              self.handle_ibtrader.request_finished = True
+              
            if self.handle_ibtrader.debug:
-              print "Alldone in commissionReport"
+              print "All done in commissionReport for ", execid
            self.handle_ibtrader.all_comm_filled = 1
            self.order_filled.set()
 
@@ -505,14 +514,14 @@ class IBTrader():
     tws_host = ""
     tws_clientid = 8899
     WAIT_TIME = 300
-    MAX_WAIT_SECONDS = 30
+    ok_wait_all_comm = False
     DEFAULT_MARKET_DATA_TIME = 20
     parser = None
     marketdata = [[] for i in range(1000)]
 #https://www.interactivebrokers.com/en/software/api/apiguide/tables/api_message_codes.htm
     FOREX_SYMS=['EUR', 'JPY', 'GBP', 'AUD', 'USD', 'EUR.USD', 'JPY.USD', 'GBP.USD', 'AUD.USD', 'USD.JPY']
-    ERRORS_TO_TRIGGER=[103, 162, 200, 201, 202, 203,  326,399, 406, 412, 420, 434, 478, 502, 504, 505, 511, 512, 515, 516, 517,  1100, 2105 ]
-    ERRORS_TO_TRIGGER_ORDRPLACED=[103, 200, 201, 202, 203, 326, 399, 406, 412, 434, 502, 504, 505, 512, 515, 516, 517,  1100 ]
+    ERRORS_TO_TRIGGER=[103, 162, 200, 201, 202, 203,  326, 406, 412, 420, 434, 478, 502, 504, 505, 511, 512, 515, 516, 517,  1100, 2105 ]
+    ERRORS_TO_TRIGGER_ORDRPLACED=[103, 200, 201, 202, 203, 326, 406, 412, 434, 502, 504, 505, 512, 515, 516, 517,  1100 ]
 
     def init_vars_before_each_call(self):
 
@@ -523,6 +532,7 @@ class IBTrader():
         self.request_finished=False
         self.execlist = []
         self.getting_today_executions = False
+        self.wait_for_commission_reports_to_finish = False
         self.partial_avg_price_per_share = 0
         self.partial_shares_filled = 0
         self.avg_price_per_share = 0
@@ -640,7 +650,7 @@ class IBTrader():
         self.tws.reqAllOpenOrders()
         
         while not self.request_finished:
-            if (time.time() - start_time) > self.MAX_WAIT_SECONDS:
+            if (time.time() - start_time) > self.WAIT_TIME:
                 ## You should have thought that IB would told you we had finished
                 self.request_finished=True
                 self.is_request_open_order=False
@@ -680,7 +690,7 @@ class IBTrader():
         self.tws.reqAccountUpdates(True, self.account_number)
         start_time=time.time()
         while not self.request_finished:
-            if (time.time() - start_time) > self.MAX_WAIT_SECONDS:
+            if (time.time() - start_time) > self.WAIT_TIME:
                 self.request_finished=True
                 self.iserror=True
             pass
@@ -735,7 +745,7 @@ class IBTrader():
         return order_id
         #endif
 
-    def place_order(self, symbol, secType, exchange, primaryExchange, currency, action, lmtPrice, orderType, totalQuantity, user_account, no_wait_for_complete = True):
+    def place_order(self, symbol, secType, exchange, primaryExchange, currency, action, lmtPrice, orderType, totalQuantity, user_account, no_wait_for_complete = True, use_this_orderid = 0):
         self.init_vars_before_each_call()
 
         self.is_placing_order = True
@@ -747,7 +757,10 @@ class IBTrader():
 
         if self.debug:
            print('Waiting for valid order id')
-        order_id = self.get_next_valid_orderid()
+        if use_this_orderid:
+           order_id = int(use_this_orderid)
+        else:
+           order_id = self.get_next_valid_orderid()
 
         if not order_id:
             self.is_placing_order = False
@@ -908,51 +921,71 @@ class IBTrader():
         return quotedict
 
     def convert_marketdata_to_dictonary(self, ibcontract,reqid):
-        lasttimeupdate = self.marketdata[reqid][IB_Tick_Type.LAST_TIMESTAMP]
-        if lasttimeupdate:
-            str_lasttimeupdate = str(datetime.datetime.fromtimestamp(int(lasttimeupdate)))
-        else:
-            lasttimeupdate = 0
-            str_lasttimeupdate = ""
-        quotedict = dict(symbol=ibcontract.symbol, localsymbol=ibcontract.localSymbol, lasttimeupdate = str_lasttimeupdate, int_lasttimeupdate = lasttimeupdate)
-        for x in range(IB_Tick_Type.MAX_TICK_TYPE):
-            val = self.marketdata[reqid][x]
-            if val:
-                dstr = IB_Tick_Type.desc[x]
-                quotedict[dstr] = val
-                if self.debug:
-                    print "self.marketdata[%d][%s] = %s" % ( reqid, dstr, val)
-        return quotedict
+        try:
+
+            lasttimeupdate = self.marketdata[reqid][IB_Tick_Type.LAST_TIMESTAMP]
+            if lasttimeupdate:
+                str_lasttimeupdate = str(datetime.datetime.fromtimestamp(int(lasttimeupdate)))
+            else:
+                lasttimeupdate = 0
+                str_lasttimeupdate = ""
+            quotedict = dict(symbol=ibcontract.symbol, localsymbol=ibcontract.localSymbol, lasttimeupdate = str_lasttimeupdate, int_lasttimeupdate = lasttimeupdate)
+            for x in range(IB_Tick_Type.MAX_TICK_TYPE):
+                val = self.marketdata[reqid][x]
+                if val:
+                    dstr = IB_Tick_Type.desc[x]
+                    quotedict[dstr] = val
+                    if self.debug:
+                        print "self.marketdata[%d][%s] = %s" % ( reqid, dstr, val)
+            return quotedict
+
+        except:
+            return None
 
     def get_quote_list(self, ibcontract, reqid):
-       obj = self.marketdata[reqid]
-       return obj
+        try:
+           obj = self.marketdata[reqid]
+           return obj
+        except:
+            return None
 
     def get_quote_dictionary(self, ibcontract, reqid):
        obj = self.convert_marketdata_to_dictonary(ibcontract, reqid)
        return obj
 
     def get_last_bid_price(self,  reqid):
-        val = float(self.marketdata[reqid][IB_Tick_Type.BID_PRICE])
-        if val == 0:
-           val = float(self.marketdata[reqid][IB_Tick_Type.CLOSE_PRICE])
-        return val
+        try:
+            val = float(self.marketdata[reqid][IB_Tick_Type.BID_PRICE])
+            if val == 0:
+               val = float(self.marketdata[reqid][IB_Tick_Type.CLOSE_PRICE])
+            return val
+        except:
+            return None
 
     def get_last_ask_price(self,  reqid):
-        val = float(self.marketdata[reqid][IB_Tick_Type.ASK_PRICE])
-        if val == 0:
-           val = float(self.marketdata[reqid][IB_Tick_Type.CLOSE_PRICE])
-        return val
+        try:
+            val = float(self.marketdata[reqid][IB_Tick_Type.ASK_PRICE])
+            if val == 0:
+               val = float(self.marketdata[reqid][IB_Tick_Type.CLOSE_PRICE])
+            return val
+        except:
+            return None
 
     def get_last_trade_price(self,  reqid):
-        val = float(self.marketdata[reqid][IB_Tick_Type.LAST_PRICE])
-        if val == 0:
-           val = float(self.marketdata[reqid][IB_Tick_Type.CLOSE_PRICE])
-        return val
+        try:
+            val = float(self.marketdata[reqid][IB_Tick_Type.LAST_PRICE])
+            if val == 0:
+               val = float(self.marketdata[reqid][IB_Tick_Type.CLOSE_PRICE])
+            return val
+        except:
+            return None
 
     def get_last_trade_time(self,  reqid):
-        val = int(self.marketdata[reqid][IB_Tick_Type.LAST_TIMESTAMP])
-        return val
+        try:
+            val = int(self.marketdata[reqid][IB_Tick_Type.LAST_TIMESTAMP])
+            return val
+        except:
+            return None
 
     def get_executions(self):
 
@@ -977,10 +1010,12 @@ class IBTrader():
 
         ## We can change ExecutionFilter to subset different orders
 
+        if self.debug:
+           print "get_executions started at ", datetime.datetime.now()
         self.tws.reqExecutions(self.ID_FOR_EXECUTIONS, ExecutionFilter())
 
         while not self.request_finished:
-                if (time.time() - start_time) > self.MAX_WAIT_SECONDS:
+                if (time.time() - start_time) > self.WAIT_TIME:
                         self.request_finished=True
                         self.iserror=True
                 pass
@@ -991,6 +1026,9 @@ class IBTrader():
         if self.iserror:
                 pass
                 #raise Exception("Problem getting executions")
+
+        if self.debug:
+           print "get_executions finished at ", datetime.datetime.now()
 
         for key in self.execlist:
             execid = key["execid"]
@@ -1177,6 +1215,8 @@ class IBTrader():
               time.sleep(1)
 
         if args.new_order or args.trade_stock or args.trade_forex or args.trade_options:
+                if args.order_id == 'not_a_order_id':
+                       args.order_id = 0
 
                 if args.symbol == 'not_a_symbol':
                         print "No symbol passed in order"
@@ -1251,7 +1291,7 @@ class IBTrader():
                 if order_primaryexchange == 'not_a_primaryexchange':
                    order_primaryexchange = order_exchange
 
-                mystr = self.place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number, args.no_wait_for_complete)
+                mystr = self.place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number, args.no_wait_for_complete, args.order_id)
                 #print mystr
 
         if args.print_executions or args.print_sym_executions or args.print_order_id:
@@ -1330,7 +1370,7 @@ class IBTrader():
                                 if order_exchange == '':
                                    order_exchange = self.get_order_exchange(order_symbol, order_secType, order_currency)
                                 order_primaryexchange = order_exchange
-                                self.place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number, True)
+                                self.place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number, True, 0)
         #24 {'orderid': 24L, 'exchange': 'IDEALPRO', 'secType': 'CASH', 'orderType': 'LMT', 'primaryExchange': '', 'clientid': 8899L, 'qty': 100000, 'currency': 'USD', 'contract': <swigibpy.Contract; proxy of <Swig Object of type 'Contract *' at 0x7fb0883a2480> >, 'action': 'BUY', 'expiry': '', 'symbol': 'EUR', 'quantity': 100000L, 'side': 'BUY'}
         if args.print_open_orders or args.cancel_all_orders or args.cancel_sym_order or args.print_open_sym_orders:
                 openorders = self.get_open_orders()
