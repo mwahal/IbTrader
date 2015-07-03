@@ -49,20 +49,21 @@ class DbAccountInfo(BaseModel):
 
     def __str__(self):
         mystr = ""
-        mystr += "\n" + " account_number " +  self.account_number
-        mystr += "\n" + " account_broker " +  self.account_broker
-        mystr += "\n" + " account_name " +  self.account_name
-        mystr += "\n" + " account_config_id " +  self.account_config_id
-        mystr += "\n" + " account_value " +  str(self.account_value)
-        mystr += "\n" + " minimum_account_value " +  str(self.minimum_account_value)
-        mystr += "\n" + " gw_tcp_ip_addr " +  self.gw_tcp_ip_addr
-        mystr += "\n" + " gw_tcp_port_num " +  str(self.gw_tcp_port_num)
-        mystr += "\n" + " tws_tcp_ip_addr " +  self.tws_tcp_ip_addr
-        mystr += "\n" + " tws_tcp_port_num " +  str(self.tws_tcp_port_num)
-        mystr += "\n" + " timelastsynced " +  str(self.timelastsynced)
-        mystr += "\n" + " hostname " +  str(self.hostname)
-        mystr += "\n" + " portnumber " +  str(self.portnumber)
-        mystr += "\n" + " nextvalidorderid " +  str(self.nextvalidorderid)
+        newline = ""  # "\n" 
+        mystr += newline + " account_number " +  self.account_number
+        mystr += newline + " account_broker " +  self.account_broker
+        mystr += newline + " account_name " +  self.account_name
+        mystr += newline + " account_config_id " +  self.account_config_id
+        mystr += newline + " account_value " +  str(self.account_value)
+        mystr += newline + " minimum_account_value " +  str(self.minimum_account_value)
+        mystr += newline + " gw_tcp_ip_addr " +  self.gw_tcp_ip_addr
+        mystr += newline + " gw_tcp_port_num " +  str(self.gw_tcp_port_num)
+        mystr += newline + " tws_tcp_ip_addr " +  self.tws_tcp_ip_addr
+        mystr += newline + " tws_tcp_port_num " +  str(self.tws_tcp_port_num)
+        mystr += newline + " timelastsynced " +  str(self.timelastsynced)
+        mystr += newline + " hostname " +  str(self.hostname)
+        mystr += newline + " portnumber " +  str(self.portnumber)
+        mystr += newline + " nextvalidorderid " +  str(self.nextvalidorderid)
         return mystr
 
 
@@ -93,24 +94,25 @@ class DbBrokerExecReport(BaseModel):
 
     def __str__ (self):
         mystr = ""
-        mystr +=  "\n" + " execid " +  self.execid
-        mystr +=  "\n" + " ib_orderid " +  str(self.ib_orderid)
-        mystr +=  "\n" + " account_number " +  self.account_number
-        mystr +=  "\n" + " exchange " +  self.exchange
-        mystr +=  "\n" + " primary_exchange " +  self.primary_exchange
-        mystr +=  "\n" + " clientid " +  str(self.clientid)
-        mystr +=  "\n" + " qty_filled " +  str(self.qty_filled)
-        mystr +=  "\n" + " localsymbol " +  self.localsymbol
-        mystr +=  "\n" + " execshares " +  str(self.execshares)
-        mystr +=  "\n" + " execprice " +  str(self.execprice)
-        mystr +=  "\n" + " exectime " +  str(self.exectime)
-        mystr +=  "\n" + " permid " +  str(self.permid)
-        mystr +=  "\n" + " sectype " +  self.sectype
-        mystr +=  "\n" + " avgprice " +  str(self.avgprice)
-        mystr +=  "\n" + " commissions " +  str(self.commissions)
-        mystr +=  "\n" + " symbol " +  self.symbol
-        mystr +=  "\n" + " expiry " +  self.expiry
-        mystr +=  "\n" + " side " +  self.side
+        newline = ""  # "\n" 
+        mystr +=  newline + " execid " +  self.execid
+        mystr +=  newline + " ib_orderid " +  str(self.ib_orderid)
+        mystr +=  newline + " account_number " +  self.account_number
+        mystr +=  newline + " exchange " +  self.exchange
+        mystr +=  newline + " primary_exchange " +  self.primary_exchange
+        mystr +=  newline + " clientid " +  str(self.clientid)
+        mystr +=  newline + " qty_filled " +  str(self.qty_filled)
+        mystr +=  newline + " localsymbol " +  self.localsymbol
+        mystr +=  newline + " execshares " +  str(self.execshares)
+        mystr +=  newline + " execprice " +  str(self.execprice)
+        mystr +=  newline + " exectime " +  str(self.exectime)
+        mystr +=  newline + " permid " +  str(self.permid)
+        mystr +=  newline + " sectype " +  self.sectype
+        mystr +=  newline + " avgprice " +  str(self.avgprice)
+        mystr +=  newline + " commissions " +  str(self.commissions)
+        mystr +=  newline + " symbol " +  self.symbol
+        mystr +=  newline + " expiry " +  self.expiry
+        mystr +=  newline + " side " +  self.side
         return mystr
 
     class Meta:
@@ -138,24 +140,25 @@ class DbBrokerPortfolio(BaseModel):
 
     def __str__ (self):
         mystr = ""
-        mystr += "\n" + " accountname " + self.accountname
-        mystr += "\n" + " averagecost " + str(self.averagecost)
-        mystr += "\n" + " local_symbol " + self.local_symbol
-        mystr += "\n" + " costprice " + str(self.costprice)
-        mystr += "\n" + " gnloss " + str(self.gnloss)
-        mystr += "\n" + " holding_type " + self.holding_type
-        mystr += "\n" + " marketprice " + str(self.marketprice)
-        mystr += "\n" + " marketvalue " + str(self.marketvalue)
-        mystr += "\n" + " quantity " + str(self.quantity)
-        mystr += "\n" + " symbol " + self.symbol
-        mystr += "\n" + " curr_action " + self.curr_action
-        mystr += "\n" + " flip_action " + self.flip_action
-        mystr += "\n" + " sectype " + self.sectype
-        mystr += "\n" + " expiry " + self.expiry
-        mystr += "\n" + " currency " + self.currency
-        mystr += "\n" + " exchange " + self.exchange
-        mystr += "\n" + " primary_exchange " + self.primary_exchange
-        mystr += "\n" + " unrealizedpnl " + str(self.unrealizedpnl)
+        newline = ""  # "\n" 
+        mystr += newline + " accountname " + self.accountname
+        mystr += newline + " averagecost " + str(self.averagecost)
+        mystr += newline + " local_symbol " + self.local_symbol
+        mystr += newline + " costprice " + str(self.costprice)
+        mystr += newline + " gnloss " + str(self.gnloss)
+        mystr += newline + " holding_type " + self.holding_type
+        mystr += newline + " marketprice " + str(self.marketprice)
+        mystr += newline + " marketvalue " + str(self.marketvalue)
+        mystr += newline + " quantity " + str(self.quantity)
+        mystr += newline + " symbol " + self.symbol
+        mystr += newline + " curr_action " + self.curr_action
+        mystr += newline + " flip_action " + self.flip_action
+        mystr += newline + " sectype " + self.sectype
+        mystr += newline + " expiry " + self.expiry
+        mystr += newline + " currency " + self.currency
+        mystr += newline + " exchange " + self.exchange
+        mystr += newline + " primary_exchange " + self.primary_exchange
+        mystr += newline + " unrealizedpnl " + str(self.unrealizedpnl)
         return mystr
 
     class Meta:
@@ -178,19 +181,20 @@ class DbAllQuote(BaseModel):
     
     def __str__ (self):
         mystr = ""
-        mystr += "\n" + " symbol " +  self.symbol
-        mystr += "\n" + " high_price " +  str(self.high_price)
-        mystr += "\n" + " low_price " +  str(self.low_price)
-        mystr += "\n" + " open_price " +  str(self.open_price)
-        mystr += "\n" + " last_bid_price " +  str(self.last_bid_price)
-        mystr += "\n" + " last_bid_time " +  str(self.last_bid_time)
-        mystr += "\n" + " last_ask_price " +  str(self.last_ask_price)
-        mystr += "\n" + " last_ask_time " +  str(self.last_ask_time)
-        mystr += "\n" + " last_trade_price " +  str(self.last_trade_price)
-        mystr += "\n" + " last_trade_time " +  str(self.last_trade_time)
-        mystr += "\n" + " volume " +  str(self.volume)
+        newline = ""  # "\n" 
+        mystr += newline + " symbol " +  self.symbol
+        mystr += newline + " high_price " +  str(self.high_price)
+        mystr += newline + " low_price " +  str(self.low_price)
+        mystr += newline + " open_price " +  str(self.open_price)
+        mystr += newline + " last_bid_price " +  str(self.last_bid_price)
+        mystr += newline + " last_bid_time " +  str(self.last_bid_time)
+        mystr += newline + " last_ask_price " +  str(self.last_ask_price)
+        mystr += newline + " last_ask_time " +  str(self.last_ask_time)
+        mystr += newline + " last_trade_price " +  str(self.last_trade_price)
+        mystr += newline + " last_trade_time " +  str(self.last_trade_time)
+        mystr += newline + " volume " +  str(self.volume)
         #self.diffbidtradetime = datetime.datetime.strptime(self.last_bid_time, "%Y-%m-%d %H:%M:%S") - datetime.datetime.strptime(self.last_trade_time, "%Y-%m-%d %H:%M:%S")
-        mystr += "\n" + " diffbidtradetime " +  str(self.diffbidtradetime) #+  str(self.diffbidtradetime.total_seconds())
+        mystr += newline + " diffbidtradetime " +  str(self.diffbidtradetime) #+  str(self.diffbidtradetime.total_seconds())
         return mystr
 
     class Meta:
@@ -221,18 +225,19 @@ class DbCommandsFromATS(BaseModel):
 
       def __str__ (self):
           mystr = ""
-          mystr += "\n" + " account_number = " + self.account_number
-          mystr += "\n" + " account_config_id = " + self.account_config_id
-          mystr += "\n" + " command = " + self.command
-          mystr += "\n" + " data = " + str(self.data)
-          mystr += "\n" + " more_data = " + str(self.more_data)
-          mystr += "\n" + " output_data = " + str(self.output_data)
-          mystr += "\n" + " output_more_data = " + str(self.output_more_data)
-          mystr += "\n" + " command_created = " + str(self.command_created)
-          mystr += "\n" + " command_processed = " + str(self.command_processed)
-          mystr += "\n" + " command_created_time = " + str(self.command_created_time)
-          mystr += "\n" + " command_processed_time = " + str(self.command_processed)
-          mystr += "\n" + " uniqid = " + str(self.uniqid)
+          newline = ""  # "\n" 
+          mystr += newline + " account_number = " + self.account_number
+          mystr += newline + " account_config_id = " + self.account_config_id
+          mystr += newline + " command = " + self.command
+          mystr += newline + " data = " + str(self.data)
+          mystr += newline + " more_data = " + str(self.more_data)
+          mystr += newline + " output_data = " + str(self.output_data)
+          mystr += newline + " output_more_data = " + str(self.output_more_data)
+          mystr += newline + " command_created = " + str(self.command_created)
+          mystr += newline + " command_processed = " + str(self.command_processed)
+          mystr += newline + " command_created_time = " + str(self.command_created_time)
+          mystr += newline + " command_processed_time = " + str(self.command_processed)
+          mystr += newline + " uniqid = " + str(self.uniqid)
           return mystr
 
       class Meta:
@@ -254,24 +259,26 @@ class DbGetAllExecutions(BaseModel):
     localsymbol = CharField(index=True, null=True)
     total_value = IntegerField(null=True, default = 0)
 
+    def __str__ (self):
+        mystr = ""
+        newline = ""  # "\n" 
+        mystr += newline + " ib_orderid " +  str(self.ib_orderid)
+        mystr += newline + " avgprice " +  str(self.avgprice)
+        mystr += newline + " commissions " +  str(self.commissions)
+        mystr += newline + " group_number " +  str(self.group_number)
+        mystr += newline + " last_exectime " +  str(self.last_exectime)
+        mystr += newline + " numexec " +  str(self.numexec)
+        mystr += newline + " order_number " +  str(self.order_number)
+        mystr += newline + " qty_filled " +  str(self.qty_filled)
+        mystr += newline + " side " +  self.side
+        mystr += newline + " symbol " +  self.symbol
+        mystr += newline + " localsymbol " +  self.localsymbol
+        mystr += newline + " total_value " +  str(self.total_value)
+        return mystr
+
     class Meta:
         db_table = 'DB_GET_ALL_EXECUTIONS'
 
-    def __str__ (self):
-        mystr = ""
-        mystr += "\n" + " ib_orderid " +  str(self.ib_orderid)
-        mystr += "\n" + " avgprice " +  str(self.avgprice)
-        mystr += "\n" + " commissions " +  str(self.commissions)
-        mystr += "\n" + " group_number " +  str(self.group_number)
-        mystr += "\n" + " last_exectime " +  str(self.last_exectime)
-        mystr += "\n" + " numexec " +  str(self.numexec)
-        mystr += "\n" + " order_number " +  str(self.order_number)
-        mystr += "\n" + " qty_filled " +  str(self.qty_filled)
-        mystr += "\n" + " side " +  self.side
-        mystr += "\n" + " symbol " +  self.symbol
-        mystr += "\n" + " localsymbol " +  self.localsymbol
-        mystr += "\n" + " total_value " +  str(self.total_value)
-        return mystr
 
 class DbGroup(BaseModel):
     net_equity = IntegerField(null=True, default = 0)
@@ -318,6 +325,7 @@ class DbGroup(BaseModel):
     shortallow_b = IntegerField(db_column='ShortAllow_B', null=True, default = 0)
     symbol_a = CharField(db_column='Symbol_A', index=True, null=True)
     symbol_b = CharField(db_column='Symbol_B', index=True, null=True)
+    group_handle_broker = IntegerField(index=True, default = 0)
     broker_object_symbol_a = IntegerField(index=True, default = 0)
     broker_object_symbol_b = IntegerField(index=True, default = 0)
     local_symbol_a = CharField(db_column='Local_Symbol_A', index=True, null=True)
@@ -360,91 +368,97 @@ class DbGroup(BaseModel):
     group_number = PrimaryKeyField()
 
 
-    def __str__ (self):
+    def __str__ (self, nl = True):
        mystr = ""
-       mystr += "\n" + " group_number " +   str(self.group_number)
-       mystr += "\n" + " initial_equity " +   str(self.initial_equity)
-       mystr += "\n" + " current_equity " +   str(self.current_equity)
-       mystr += "\n" + " net_equity " +   str(self.net_equity)
-       mystr += "\n" + " net_equity_a " +   str(self.net_equity_a)
-       mystr += "\n" + " net_equity_b " +   str(self.net_equity_b)
-       mystr += "\n" + " timelastsynced " +   str(self.timelastsynced)
-       mystr += "\n" + " db_order_open_time " +   str(self.db_order_open_time)
-       mystr += "\n" + " db_order_filled_time " +   str(self.db_order_filled_time)
-       mystr += "\n" + " db_order_update_time " +   str(self.db_order_update_time)
-       mystr += "\n" + " db_diff_order_open_to_fill_time " +   str(self.db_diff_order_open_to_fill_time)
-       mystr += "\n" + " db_diff_order_open_to_update_time " +   str(self.db_diff_order_open_to_update_time)
-       mystr += "\n" + " is_pair_trading " +   str(self.is_pair_trading)
-       mystr += "\n" + " symbol_a " +   self.symbol_a
-       mystr += "\n" + " local_symbol_a " +   self.local_symbol_a
-       mystr += "\n" + " leverage_a " +   str(self.leverage_a)
-       mystr += "\n" + " longallow_a " +   str(self.longallow_a)
-       mystr += "\n" + " shortallow_a " +   str(self.shortallow_a)
-       mystr += "\n" + " currency_a " +   self.currency_a
-       mystr += "\n" + " exchange_a " +   self.exchange_a
-       mystr += "\n" + " sectype_a " +   str(self.sectype_a)
-       mystr += "\n" + " round_digits_a " +   str(self.round_digits_a)
-       mystr += "\n" + " symbol_b " +   str(self.symbol_b)
-       mystr += "\n" + " local_symbol_b " +   str(self.local_symbol_b)
-       mystr += "\n" + " leverage_b " +   str(self.leverage_b)
-       mystr += "\n" + " longallow_b " +   str(self.longallow_b)
-       mystr += "\n" + " shortallow_b " +   str(self.shortallow_b)
-       mystr += "\n" + " currency_b " +   str(self.currency_b)
-       mystr += "\n" + " exchange_b " +   str(self.exchange_b)
-       mystr += "\n" + " sectype_b " +   str(self.sectype_b)
-       mystr += "\n" + " round_digits_b " +   str(self.round_digits_b)
-       mystr += "\n" + " currentordernumber " +   str(self.currentordernumber)
-       mystr += "\n" + " dont_trade " +   str(self.dont_trade)
-       mystr += "\n" + " lastiborderid " +   str(self.lastiborderid)
-       mystr += "\n" + " market_value_a " +   str(self.market_value_a)
-       mystr += "\n" + " market_value_b " +   str(self.market_value_b)
-       mystr += "\n" + " neworderaction " +   str(self.neworderaction)
-       mystr += "\n" + " neworderstate " +   str(self.neworderstate)
-       mystr += "\n" + " newordertype " +   str(self.newordertype)
-       mystr += "\n" + " pair_position_type " +   str(self.pair_position_type)
-       mystr += "\n" + " partial_fill_a " +   str(self.partial_fill_a)
-       mystr += "\n" + " partial_fill_b " +   str(self.partial_fill_b)
-       mystr += "\n" + " pending_hold_ib_orderid " +   str(self.pending_hold_ib_orderid)
-       mystr += "\n" + " pending_hold_order_number " +   str(self.pending_hold_order_number)
-       mystr += "\n" + " position_holdingtype_a " +   str(self.position_holdingtype_a)
-       mystr += "\n" + " position_holdingtype_b " +   str(self.position_holdingtype_b)
-       mystr += "\n" + " shares_filled_a " +   str(self.shares_filled_a)
-       mystr += "\n" + " shares_filled_b " +   str(self.shares_filled_b)
-       mystr += "\n" + " shares_remaining_a " +   str(self.shares_remaining_a)
-       mystr += "\n" + " shares_remaining_b " +   str(self.shares_remaining_b)
-       mystr += "\n" + " shares_requested_a " +   str(self.shares_requested_a)
-       mystr += "\n" + " shares_requested_b " +   str(self.shares_requested_b)
-       mystr += "\n" + " total_commission_a " +   str(self.total_commission_a)
-       mystr += "\n" + " total_trades_a " +   str(self.total_trades_a)
-       mystr += "\n" + " total_trades_b " +   str(self.total_trades_b)
-       mystr += "\n" + " total_commission_b " +   str(self.total_commission_b)
-       mystr += "\n" + " total_slippage_a " +   str(self.total_slippage_a)
-       mystr += "\n" + " total_slippage_b " +   str(self.total_slippage_b)
-       mystr += "\n" + " total_slippage_positive_a " +   str(self.total_slippage_positive_a)
-       mystr += "\n" + " total_slippage_positive_b " +   str(self.total_slippage_positive_b)
-       mystr += "\n" + " total_slippage_negative_a " +   str(self.total_slippage_negative_a)
-       mystr += "\n" + " total_slippage_negative_b " +   str(self.total_slippage_negative_b)
-       mystr += "\n" + " current_slippage_a " +   str(self.current_slippage_a)
-       mystr += "\n" + " current_slippage_b " +   str(self.current_slippage_b)
-       mystr += "\n" + " total_marketvalue_buy_a " +   str(self.total_marketvalue_buy_a)
-       mystr += "\n" + " total_marketvalue_buy_b " +   str(self.total_marketvalue_buy_b)
-       mystr += "\n" + " total_marketvalue_sell_a " +   str(self.total_marketvalue_sell_a)
-       mystr += "\n" + " total_marketvalue_sell_b " +   str(self.total_marketvalue_sell_b)
-       mystr += "\n" + " total_marketvalue_traded_a " +   str(self.total_marketvalue_traded_a)
-       mystr += "\n" + " total_marketvalue_traded_b " +   str(self.total_marketvalue_traded_b)
-       mystr += "\n" + " total_shares_traded_a " +   str(self.total_shares_traded_a)
-       mystr += "\n" + " total_shares_traded_b " +   str(self.total_shares_traded_b)
-       mystr += "\n" + " total_shares_buy_a " +   str(self.total_shares_buy_a)
-       mystr += "\n" + " total_shares_buy_b " +   str(self.total_shares_buy_b)
-       mystr += "\n" + " total_shares_sell_a " +   str(self.total_shares_sell_a)
-       mystr += "\n" + " total_shares_sell_b " +   str(self.total_shares_sell_b)
-       mystr += "\n" + " avgprice_a " +   str(self.avgprice_a)
-       mystr += "\n" + " avgprice_b " +   str(self.avgprice_b)
-       mystr += "\n" + " signalprice_a " +   str(self.signalprice_a)
-       mystr += "\n" + " signalprice_b " +   str(self.signalprice_b)
-       mystr += "\n" + " broker_object_symbol_a " +   str(self.broker_object_symbol_a)
-       mystr += "\n" + " broker_object_symbol_b " +   str(self.broker_object_symbol_b)
-       mystr += "\n" + " waitingtobefilled " +   str(self.waitingtobefilled)
+       if nl:
+          newline = "\n"  # "\n" 
+       else:
+          newline = ""  # "\n" 
+       mystr += newline + " group_number " +   str(self.group_number)
+       mystr += newline + " initial_equity " +   str(self.initial_equity)
+       mystr += newline + " current_equity " +   str(self.current_equity)
+       mystr += newline + " net_equity " +   str(self.net_equity)
+       mystr += newline + " net_equity_a " +   str(self.net_equity_a)
+       mystr += newline + " net_equity_b " +   str(self.net_equity_b)
+       mystr += newline + " timelastsynced " +   str(self.timelastsynced)
+       mystr += newline + " db_order_open_time " +   str(self.db_order_open_time)
+       mystr += newline + " db_order_filled_time " +   str(self.db_order_filled_time)
+       mystr += newline + " db_order_update_time " +   str(self.db_order_update_time)
+       mystr += newline + " db_diff_order_open_to_fill_time " +   str(self.db_diff_order_open_to_fill_time)
+       mystr += newline + " db_diff_order_open_to_update_time " +   str(self.db_diff_order_open_to_update_time)
+       mystr += newline + " is_pair_trading " +   str(self.is_pair_trading)
+       mystr += newline + " symbol_a " +   self.symbol_a
+       mystr += newline + " local_symbol_a " +   self.local_symbol_a
+       mystr += newline + " leverage_a " +   str(self.leverage_a)
+       mystr += newline + " longallow_a " +   str(self.longallow_a)
+       mystr += newline + " shortallow_a " +   str(self.shortallow_a)
+       mystr += newline + " currency_a " +   self.currency_a
+       mystr += newline + " exchange_a " +   self.exchange_a
+       mystr += newline + " sectype_a " +   str(self.sectype_a)
+       mystr += newline + " round_digits_a " +   str(self.round_digits_a)
+       mystr += newline + " symbol_b " +   str(self.symbol_b)
+       mystr += newline + " local_symbol_b " +   str(self.local_symbol_b)
+       mystr += newline + " leverage_b " +   str(self.leverage_b)
+       mystr += newline + " longallow_b " +   str(self.longallow_b)
+       mystr += newline + " shortallow_b " +   str(self.shortallow_b)
+       mystr += newline + " currency_b " +   str(self.currency_b)
+       mystr += newline + " exchange_b " +   str(self.exchange_b)
+       mystr += newline + " sectype_b " +   str(self.sectype_b)
+       mystr += newline + " round_digits_b " +   str(self.round_digits_b)
+       mystr += newline + " currentordernumber " +   str(self.currentordernumber)
+       mystr += newline + " currentorderstate " +   str(self.currentorderstate)
+       mystr += newline + " dont_trade " +   str(self.dont_trade)
+       mystr += newline + " lastiborderid " +   str(self.lastiborderid)
+       mystr += newline + " market_value_a " +   str(self.market_value_a)
+       mystr += newline + " market_value_b " +   str(self.market_value_b)
+       mystr += newline + " neworderaction " +   str(self.neworderaction)
+       mystr += newline + " neworderstate " +   str(self.neworderstate)
+       mystr += newline + " newordertype " +   str(self.newordertype)
+       mystr += newline + " pair_position_type " +   str(self.pair_position_type)
+       mystr += newline + " partial_fill_a " +   str(self.partial_fill_a)
+       mystr += newline + " partial_fill_b " +   str(self.partial_fill_b)
+       mystr += newline + " pending_hold_ib_orderid " +   str(self.pending_hold_ib_orderid)
+       mystr += newline + " pending_hold_order_number " +   str(self.pending_hold_order_number)
+       mystr += newline + " position_holdingtype_a " +   str(self.position_holdingtype_a)
+       mystr += newline + " position_holdingtype_b " +   str(self.position_holdingtype_b)
+       mystr += newline + " shares_filled_a " +   str(self.shares_filled_a)
+       mystr += newline + " shares_filled_b " +   str(self.shares_filled_b)
+       mystr += newline + " shares_remaining_a " +   str(self.shares_remaining_a)
+       mystr += newline + " shares_remaining_b " +   str(self.shares_remaining_b)
+       mystr += newline + " shares_requested_a " +   str(self.shares_requested_a)
+       mystr += newline + " shares_requested_b " +   str(self.shares_requested_b)
+       mystr += newline + " total_commission_a " +   str(self.total_commission_a)
+       mystr += newline + " total_trades_a " +   str(self.total_trades_a)
+       mystr += newline + " total_trades_b " +   str(self.total_trades_b)
+       mystr += newline + " total_commission_b " +   str(self.total_commission_b)
+       mystr += newline + " total_slippage_a " +   str(self.total_slippage_a)
+       mystr += newline + " total_slippage_b " +   str(self.total_slippage_b)
+       mystr += newline + " total_slippage_positive_a " +   str(self.total_slippage_positive_a)
+       mystr += newline + " total_slippage_positive_b " +   str(self.total_slippage_positive_b)
+       mystr += newline + " total_slippage_negative_a " +   str(self.total_slippage_negative_a)
+       mystr += newline + " total_slippage_negative_b " +   str(self.total_slippage_negative_b)
+       mystr += newline + " current_slippage_a " +   str(self.current_slippage_a)
+       mystr += newline + " current_slippage_b " +   str(self.current_slippage_b)
+       mystr += newline + " total_marketvalue_buy_a " +   str(self.total_marketvalue_buy_a)
+       mystr += newline + " total_marketvalue_buy_b " +   str(self.total_marketvalue_buy_b)
+       mystr += newline + " total_marketvalue_sell_a " +   str(self.total_marketvalue_sell_a)
+       mystr += newline + " total_marketvalue_sell_b " +   str(self.total_marketvalue_sell_b)
+       mystr += newline + " total_marketvalue_traded_a " +   str(self.total_marketvalue_traded_a)
+       mystr += newline + " total_marketvalue_traded_b " +   str(self.total_marketvalue_traded_b)
+       mystr += newline + " total_shares_traded_a " +   str(self.total_shares_traded_a)
+       mystr += newline + " total_shares_traded_b " +   str(self.total_shares_traded_b)
+       mystr += newline + " total_shares_buy_a " +   str(self.total_shares_buy_a)
+       mystr += newline + " total_shares_buy_b " +   str(self.total_shares_buy_b)
+       mystr += newline + " total_shares_sell_a " +   str(self.total_shares_sell_a)
+       mystr += newline + " total_shares_sell_b " +   str(self.total_shares_sell_b)
+       mystr += newline + " avgprice_a " +   str(self.avgprice_a)
+       mystr += newline + " avgprice_b " +   str(self.avgprice_b)
+       mystr += newline + " signalprice_a " +   str(self.signalprice_a)
+       mystr += newline + " signalprice_b " +   str(self.signalprice_b)
+       mystr += newline + " broker_object_symbol_a " +   str(self.broker_object_symbol_a)
+       mystr += newline + " broker_object_symbol_b " +   str(self.broker_object_symbol_b)
+       mystr += newline + " group_handle_broker " +   str(self.group_handle_broker)
+       mystr += newline + " waitingtobefilled " +   str(self.waitingtobefilled)
        return mystr
 
     class Meta:
@@ -503,26 +517,27 @@ class DbNewOrderTable(BaseModel):
 
     def __str__(self):
         mystr = ""
-        mystr += "\n" + " order_number " +  str(self.order_number)
-        mystr += "\n" + " auto_generated_randomID " +  self.auto_generated_randomID
-        mystr += "\n" + " symbol " +  self.symbol
-        mystr += "\n" + " pairsymbol " +  str(self.pairsymbol)
-        mystr += "\n" + " action " +  str(self.action)
-        mystr += "\n" + " orderType " +  self.ordertype
-        mystr += "\n" + " signalprice " +  str(self.signalprice)
-        mystr += "\n" + " avgprice " +  str(self.avgprice)
-        mystr += "\n" + " currentprice " +  str(self.currentprice)
-        mystr += "\n" + " limitprice " +  str(self.limitprice)
-        mystr += "\n" + " ib_orderid " +  str(self.ib_orderid)
-        mystr += "\n" + " group_number " +  str(self.group_number)
-        mystr += "\n" + " quantity " +  str(self.quantity)
-        mystr += "\n" + " orderstatus " +  str(self.orderstatus)
-        mystr += "\n" + " exchange " +  str(self.exchange)
-        mystr += "\n" + " currency " +  str(self.currency)
-        mystr += "\n" + " sectype " +  str(self.sectype)
-        mystr += "\n" + " signaltime " +  str(self.signaltime)
-        mystr += "\n" + " pending_hold_order_number " +  str(self.pending_hold_order_number)
-        mystr += "\n" + " incoming_order_number " +  str(self.incoming_order_number)
+        newline = ""  # "\n" 
+        mystr += newline + " symbol " +  self.symbol
+        mystr += newline + " order_number " +  str(self.order_number)
+        mystr += newline + " group_number " +  str(self.group_number)
+        mystr += newline + " incoming_order_number " +  str(self.incoming_order_number)
+        mystr += newline + " signaltime " +  str(self.signaltime)
+        mystr += newline + " action " +  str(self.action)
+        mystr += newline + " orderType " +  self.ordertype
+        mystr += newline + " signalprice " +  str(self.signalprice)
+        mystr += newline + " avgprice " +  str(self.avgprice)
+        mystr += newline + " currentprice " +  str(self.currentprice)
+        mystr += newline + " limitprice " +  str(self.limitprice)
+        mystr += newline + " ib_orderid " +  str(self.ib_orderid)
+        mystr += newline + " quantity " +  str(self.quantity)
+        mystr += newline + " orderstatus " +  str(self.orderstatus)
+        mystr += newline + " exchange " +  str(self.exchange)
+        mystr += newline + " currency " +  str(self.currency)
+        mystr += newline + " sectype " +  str(self.sectype)
+        mystr += newline + " pending_hold_order_number " +  str(self.pending_hold_order_number)
+        mystr += newline + " auto_generated_randomID " +  self.auto_generated_randomID
+        mystr += newline + " pairsymbol " +  str(self.pairsymbol)
         return mystr
 
     class Meta:
@@ -585,20 +600,21 @@ class DbOpenOrders(BaseModel):
 
     def __str__ (self):
         mystr = ""
-        mystr += "\n" + " ib_orderid " + str(self.ib_orderid)
-        mystr += "\n" + " local_symbol " + self.local_symbol
-        mystr += "\n" + " currency " + self.currency
-        mystr += "\n" + " exchange " + self.exchange
-        mystr += "\n" + " limitprice " + str(self.limitprice)
-        mystr += "\n" + " order_action " + self.order_action
-        mystr += "\n" + " order_type " + self.order_type
-        mystr += "\n" + " quantity " + str(self.quantity)
-        mystr += "\n" + " sectype " + self.sectype
-        mystr += "\n" + " status " + self.status
-        mystr += "\n" + " symbol " + self.symbol
-        mystr += "\n" + " clientid " + str(self.clientid)
-        mystr += "\n" + " account_name " + self.account_name
-        mystr += "\n" + " side " + self.side
+        newline = ""  # "\n" 
+        mystr += newline + " ib_orderid " + str(self.ib_orderid)
+        mystr += newline + " local_symbol " + self.local_symbol
+        mystr += newline + " currency " + self.currency
+        mystr += newline + " exchange " + self.exchange
+        mystr += newline + " limitprice " + str(self.limitprice)
+        mystr += newline + " order_action " + self.order_action
+        mystr += newline + " order_type " + self.order_type
+        mystr += newline + " quantity " + str(self.quantity)
+        mystr += newline + " sectype " + self.sectype
+        mystr += newline + " status " + self.status
+        mystr += newline + " symbol " + self.symbol
+        mystr += newline + " clientid " + str(self.clientid)
+        mystr += newline + " account_name " + self.account_name
+        mystr += newline + " side " + self.side
         return mystr
 
     class Meta:
@@ -633,31 +649,32 @@ class DbOrdersPlaced(BaseModel):
 
     def __str__(self):
        mystr = ""
-       mystr += "\n" + " ib_orderid " +  str(self.ib_orderid)
-       mystr += "\n" + " order_validated " +  str(self.order_validated)
-       mystr += "\n" + " account_number " +  self.account_number
-       mystr += "\n" + " avgprice " +  str(self.avgprice)
-       mystr += "\n" + " commission " +  str(self.commission)
-       mystr += "\n" + " currency " +  self.currency
-       mystr += "\n" + " exchange " +  self.exchange
-       mystr += "\n" + " group_number " +  str(self.group_number)
-       mystr += "\n" + " holding_type " +  str(self.holding_type)
-       mystr += "\n" + " limit_price " +  str(self.limit_price)
-       mystr += "\n" + " order_action " + self.order_action
-       mystr += "\n" + " order_completed " + str(self.order_completed)
-       mystr += "\n" + " order_filled_time " + str(self.order_filled_time)
-       mystr += "\n" + " order_number " + str(self.order_number)
-       mystr += "\n" + " order_open_time " + str(self.order_open_time)
-       mystr += "\n" + " order_partial_filled " + str(self.order_partial_filled)
-       mystr += "\n" + " order_type " + self.order_type
-       mystr += "\n" + " qty_filled " + str(self.qty_filled)
-       mystr += "\n" + " qty_requested " + str(self.qty_requested)
-       mystr += "\n" + " sectype " + self.sectype
-       mystr += "\n" + " signalprice " + str(self.signalprice)
-       mystr += "\n" + " slippage " + str(self.slippage)
-       mystr += "\n" + " symbol " + self.symbol
-       mystr += "\n" + " localsymbol " + str(self.localsymbol)
-       mystr += "\n" + " totalvalue " + str(self.totalvalue)
+       newline = ""  # "\n" 
+       mystr += newline + " ib_orderid " +  str(self.ib_orderid)
+       mystr += newline + " order_number " + str(self.order_number)
+       mystr += newline + " symbol " + self.symbol
+       mystr += newline + " localsymbol " + str(self.localsymbol)
+       mystr += newline + " group_number " +  str(self.group_number)
+       mystr += newline + " order_validated " +  str(self.order_validated)
+       mystr += newline + " account_number " +  self.account_number
+       mystr += newline + " avgprice " +  str(self.avgprice)
+       mystr += newline + " commission " +  str(self.commission)
+       mystr += newline + " currency " +  self.currency
+       mystr += newline + " exchange " +  self.exchange
+       mystr += newline + " holding_type " +  str(self.holding_type)
+       mystr += newline + " limit_price " +  str(self.limit_price)
+       mystr += newline + " order_action " + self.order_action
+       mystr += newline + " order_completed " + str(self.order_completed)
+       mystr += newline + " order_filled_time " + str(self.order_filled_time)
+       mystr += newline + " order_open_time " + str(self.order_open_time)
+       mystr += newline + " order_partial_filled " + str(self.order_partial_filled)
+       mystr += newline + " order_type " + self.order_type
+       mystr += newline + " qty_filled " + str(self.qty_filled)
+       mystr += newline + " qty_requested " + str(self.qty_requested)
+       mystr += newline + " sectype " + self.sectype
+       mystr += newline + " signalprice " + str(self.signalprice)
+       mystr += newline + " slippage " + str(self.slippage)
+       mystr += newline + " totalvalue " + str(self.totalvalue)
        return mystr
 
     class Meta:
@@ -675,14 +692,15 @@ class DbOutstandingOrders(BaseModel):
 
     def __str__(self):
         mystr = ""
-        mystr += "\n" + " ib_orderid " + str(self.ib_orderid)
-        mystr += "\n" + " symbol " + self.symbol
-        mystr += "\n" + " group_number " + str(self.group_number)
-        mystr += "\n" + " order_open_time " + str(self.order_open_time)
-        mystr += "\n" + " is_order_canceled " + str(self.is_order_canceled)
-        mystr += "\n" + " is_order_open " + str(self.is_order_open)
-        mystr += "\n" + " order_filled_time " + str(self.order_filled_time)
-        mystr += "\n" + " order_number " + str(self.order_number)
+        newline = ""  # "\n" 
+        mystr += newline + " ib_orderid " + str(self.ib_orderid)
+        mystr += newline + " symbol " + self.symbol
+        mystr += newline + " group_number " + str(self.group_number)
+        mystr += newline + " order_open_time " + str(self.order_open_time)
+        mystr += newline + " is_order_canceled " + str(self.is_order_canceled)
+        mystr += newline + " is_order_open " + str(self.is_order_open)
+        mystr += newline + " order_filled_time " + str(self.order_filled_time)
+        mystr += newline + " order_number " + str(self.order_number)
         return mystr
         
     class Meta:
@@ -694,6 +712,7 @@ class DbNextValidOrderID(BaseModel):
 
       def __str__ (self):
           mystr = ""
+          newline = ""  # "\n" 
           mystr += " account_number " + str(self.account_number)
           mystr += " nextvalidorderid " + str(self.nextvalidorderid)
 
@@ -727,23 +746,24 @@ class DbIncomingOrders(BaseModel):
 
       def __str__ (self):
           mystr = ""
-          mystr += "\n" + " account_number " + self.account_number
-          mystr += "\n" + " order_number " + str(self.order_number)
-          mystr += "\n" + " symbol " + self.symbol
-          mystr += "\n" + " order_action " + self.order_action
-          mystr += "\n" + " order_type " + self.order_type
-          mystr += "\n" + " trade_instrument_type " + str(self.trade_instrument_type)
-          mystr += "\n" + " sectype " + self.sectype
-          mystr += "\n" + " exchange " + self.exchange
-          mystr += "\n" + " currency " + self.currency
-          mystr += "\n" + " limit_price " + str(self.limit_price)
-          mystr += "\n" + " signal_price " + str(self.signal_price)
-          mystr += "\n" + " quantity " + str(self.quantity)
-          mystr += "\n" + " order_open_time " + str(self.order_open_time)
-          mystr += "\n" + " order_start_time " + str(self.order_start_time)
-          mystr += "\n" + " order_end_time " + str(self.order_end_time)
-          mystr += "\n" + " order_created " + str(self.order_created)
-          mystr += "\n" + " order_processed " + str(self.order_processed)
+          newline = ""  # "\n" 
+          mystr += newline + " account_number " + self.account_number
+          mystr += newline + " order_number " + str(self.order_number)
+          mystr += newline + " symbol " + self.symbol
+          mystr += newline + " order_action " + self.order_action
+          mystr += newline + " order_type " + self.order_type
+          mystr += newline + " trade_instrument_type " + str(self.trade_instrument_type)
+          mystr += newline + " sectype " + self.sectype
+          mystr += newline + " exchange " + self.exchange
+          mystr += newline + " currency " + self.currency
+          mystr += newline + " limit_price " + str(self.limit_price)
+          mystr += newline + " signal_price " + str(self.signal_price)
+          mystr += newline + " quantity " + str(self.quantity)
+          mystr += newline + " order_open_time " + str(self.order_open_time)
+          mystr += newline + " order_start_time " + str(self.order_start_time)
+          mystr += newline + " order_end_time " + str(self.order_end_time)
+          mystr += newline + " order_created " + str(self.order_created)
+          mystr += newline + " order_processed " + str(self.order_processed)
           return mystr
 
       class Meta:
