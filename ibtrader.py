@@ -142,7 +142,7 @@ class IB_Tick_Type():
     desc[TRADE_RATE] = "TRADE_RATE"
     desc[VOLUME_RATE] = "VOLUME_RATE"
 
-    desc[99] = "SYMBOL"
+    desc[SYMBOL] = "SYMBOL"
 
 class IBWrapper(EWrapper):
     '''Callback object passed to TWS, these functions will be called directly
