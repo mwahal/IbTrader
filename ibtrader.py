@@ -217,15 +217,23 @@ class IBWrapper(EWrapper):
 
         """
 
-        ## Any errors not on this list we just treat as information
-       
+        errorCode = int(errorCode)
         errorString = errorString.replace('\n', ' ').replace('\r', '')
+        if self.handle_ibtrader.debug:
+           print "ERROR errorCode = %d errorString = %s" % (errorCode, errorString)
+        if errorCode in self.handle_ibtrader.ERRORS_TO_DISCONNECT_IB:
+           self.handle_ibtrader.tws_disconnected(errorCode)
+
+        if errorCode in self.handle_ibtrader.ERRORS_TO_RECONNECT_IB:
+           self.handle_ibtrader.tws_reconnected(errorCode)
+       
 
         self.handle_ibtrader.errors_to_trig = self.handle_ibtrader.is_placing_order and self.handle_ibtrader.ERRORS_TO_TRIGGER_ORDRPLACED or self.handle_ibtrader.ERRORS_TO_TRIGGER
+        is_place_order_error = (self.handle_ibtrader.is_placing_order and errorCode >= self.handle_ibtrader.ERRORS_IB_300_START and errorCode <= self.handle_ibtrader.ERRORS_IB_399_END)
         if self.handle_ibtrader.debug:
            print "errors_to_trig ", self.handle_ibtrader.errors_to_trig
-           print "ERROR errorCode = %d errorString = %s" % (errorCode, errorString)
-        if errorCode in self.handle_ibtrader.errors_to_trig:
+           print "is_place_order_error ", is_place_order_error
+        if errorCode in self.handle_ibtrader.errors_to_trig or is_place_order_error:
             self.handle_ibtrader.global_errorString = errorString
             self.handle_ibtrader.global_errorCode = errorCode
             self.handle_ibtrader.iserror=True
@@ -277,6 +285,8 @@ class IBWrapper(EWrapper):
 
     def execDetails(self, orderid, contract, execution):
         
+        if self.handle_ibtrader.debug:
+           print "execDetails(orderid = %d, contract = %s, execution = %s)" % (orderid, contract, execution)
 
         if self.handle_ibtrader.getting_today_executions == 0 and self.handle_ibtrader.order is None:
            if self.handle_ibtrader.debug:
@@ -547,11 +557,18 @@ class IBTrader():
     global_commdetails = {}
     global_execdetails = {}
     global_orderids_execdetails = {}
+    is_ib_connected = False
+
     marketdata = [[] for i in range(1000)]
 #https://www.interactivebrokers.com/en/software/api/apiguide/tables/api_message_codes.htm
     FOREX_SYMS=['EUR', 'JPY', 'GBP', 'AUD', 'USD', 'EUR.USD', 'JPY.USD', 'GBP.USD', 'AUD.USD', 'USD.JPY']
     ERRORS_TO_TRIGGER=[103, 162, 200, 201, 202, 203,  326, 406, 412, 420, 434, 478, 502, 504, 505, 511, 512, 515, 516, 517,  1100, 2105 ]
     ERRORS_TO_TRIGGER_ORDRPLACED=[103, 200, 201, 202, 203, 326, 406, 412, 434, 502, 504, 505, 512, 515, 516, 517,  1100 ]
+    ERROR_ODD_LOT = "will be routed as an odd lot" 
+    ERRORS_IB_300_START = 300
+    ERRORS_IB_399_END = 399
+    ERRORS_TO_RECONNECT_IB=[1101, 1102]
+    ERRORS_TO_DISCONNECT_IB=[1100, 1300, 2110]
 
     def init_vars_before_each_call(self):
 
@@ -602,6 +619,19 @@ class IBTrader():
        self.connect_to_tws()
        self.get_CurrentTime()
 
+    def tws_disconnected(self, errorCode):
+       self.is_ib_connected = False
+       if self.debug:
+          print "tws_disconnected(errorCode = %d at = %s)" % (errorCode, datetime.datetime.now())
+
+    def tws_reconnected(self, errorCode):
+       if self.debug:
+          print "tws_reconnected(errorCode = %d at = %s)" % (errorCode, datetime.datetime.now())
+       self.is_ib_connected = True
+       self.get_executions()
+
+    def ib_connection_status(self):
+        return self.is_ib_connected
 
     def get_base_currency_cash(self):
         return self.base_currency_cash
@@ -620,10 +650,14 @@ class IBTrader():
         # Connect to tws running on localhost
         if not self.tws.eConnect(self.tws_host, self.tcp_port, self.tws_clientid):
                 raise RuntimeError('Failed to connect to TWS')
+        self.is_ib_connected = True
+        if self.debug:
+           print "Connect to tws at %s" % (datetime.datetime.now())
         
     def disconnect_from_tws(self):
         self.tws.poll_auto = False
         self.tws.eDisconnect()
+        self.is_ib_connected = False
 
     def print_json_start(self, mapkeyword):
         mystr = "{ \"" + mapkeyword + "\" : ["   + "\n"
@@ -668,6 +702,8 @@ class IBTrader():
         Returns a list of any open orders
         """
         
+        if self.ib_connection_status() == False:
+           return None
         
         self.init_vars_before_each_call()
         self.iserror=False
@@ -704,6 +740,9 @@ class IBTrader():
         """
         Returns positions held - a particular kind of accounting information
         """
+
+        if self.ib_connection_status() == False:
+           return None
 
         self.init_vars_before_each_call()
         self.request_finished=False
@@ -779,6 +818,9 @@ class IBTrader():
         #endif
 
     def place_order(self, symbol, secType, exchange, primaryExchange, currency, action, lmtPrice, orderType, totalQuantity, user_account, no_wait_for_complete = True, use_this_orderid = 0):
+
+        if self.ib_connection_status() == False:
+           return None
 
         self.init_vars_before_each_call()
 
@@ -894,6 +936,8 @@ class IBTrader():
 
 
     def start_market_data(self, ibcontract, reqid):
+        if self.ib_connection_status() == False:
+           return None
         ## initialise the tuple
         if self.debug:
             print "init marketdata"
@@ -913,6 +957,8 @@ class IBTrader():
         return reqid 
 
     def stop_market_data(self, ibcontract, reqid):
+        if self.ib_connection_status() == False:
+           return None
         if self.debug:
             print "calling self.tws.cancelMktData"
         self.tws.cancelMktData(reqid)
@@ -924,6 +970,8 @@ class IBTrader():
         Returns a tuple (bid price, bid size, ask price, ask size)
         
         """
+        if self.ib_connection_status() == False:
+           return None
         self.init_vars_before_each_call()
         self.finished=False
         self.iserror=False
@@ -988,32 +1036,26 @@ class IBTrader():
        obj = self.convert_marketdata_to_dictonary(ibcontract, reqid)
        return obj
 
-    def get_last_bid_price(self,  reqid):
+    def get_float_field_or_close_value(self, reqid, field_type):
         try:
-            val = float(self.marketdata[reqid][BID])
-            if val == 0:
+            val = float(self.marketdata[reqid][field_type])
+            if val <= 0:
                val = float(self.marketdata[reqid][CLOSE])
+            if val <= 0:
+               print "VALUE <=0 ", val, " for reqid ", reqid, " alldata ", self.marketdata[reqid]
+               return None
             return val
         except:
             return None
+
+    def get_last_bid_price(self,  reqid):
+        return self.get_float_field_or_close_value(reqid, BID)
 
     def get_last_ask_price(self,  reqid):
-        try:
-            val = float(self.marketdata[reqid][ASK])
-            if val == 0:
-               val = float(self.marketdata[reqid][CLOSE])
-            return val
-        except:
-            return None
+        return self.get_float_field_or_close_value(reqid, ASK)
 
     def get_last_trade_price(self,  reqid):
-        try:
-            val = float(self.marketdata[reqid][LAST])
-            if val == 0:
-               val = float(self.marketdata[reqid][CLOSE])
-            return val
-        except:
-            return None
+        return self.get_float_field_or_close_value(reqid, LAST)
 
     def get_last_trade_time(self,  reqid):
         try:
@@ -1083,24 +1125,6 @@ class IBTrader():
            print "get_executions_for_orderid(orderid = %d) = %s" % (orderid,  myexec)
         return myexec
 
-    def old_get_executions_for_orderid(self, orderid):
-        myexec = []
-        for key in self.global_execdetails:
-           if self.debug:
-              print "get_executions_for_orderid(orderid = %d , key = %s)" % (orderid, key)
-           this_exec = self.global_execdetails[key]
-           this_orderid = this_exec["orderid"]
-           if this_orderid == orderid:
-             if key in self.global_commdetails:
-                 comm = int(self.global_commdetails[key])
-                 if int(this_exec["commission"]) == 0:
-                    self.update_global_execdetails_for_comm(key)
-             myexec.append(this_exec)
-
-        if self.debug:
-           print "get_executions_for_orderid(orderid = %d) = %s" % (orderid,  myexec)
-        return myexec
-
     def get_executions(self, orderid=0):
 
         """
@@ -1111,6 +1135,8 @@ class IBTrader():
            return self.get_executions_for_orderid(orderid)
 
 
+        if self.ib_connection_status() == False:
+           return None
 
         self.init_vars_before_each_call()
         self.iserror=False
@@ -1128,10 +1154,12 @@ class IBTrader():
         ## We can change ExecutionFilter to subset different orders
 
         if self.debug:
-           print "get_executions started at ", datetime.datetime.now()
+           print "get_executions started at ", datetime.datetime.now(), " self.WAIT_TIME", self.WAIT_TIME
         self.tws.reqExecutions(self.ID_FOR_EXECUTIONS, ExecutionFilter())
 
         while not self.request_finished:
+                #if self.debug:
+                #   print "get_execution loop self.request_finished ", self.request_finished, " self.iserror ", self.iserror
                 if (time.time() - start_time) > self.WAIT_TIME:
                         self.request_finished=True
                         self.iserror=True
@@ -1145,7 +1173,7 @@ class IBTrader():
                 #raise Exception("Problem getting executions")
 
         if self.debug:
-           print "get_executions finished at ", datetime.datetime.now()
+           print "get_executions finished at ", datetime.datetime.now(), "  self.request_finished ", self.request_finished, " self.iserror ", self.iserror
 
         for key in self.execlist:
             execid = key["execid"]
@@ -1162,6 +1190,31 @@ class IBTrader():
 
     def get_args(self):
         return self.args
+
+    def get_trade_price(self, symbol, local_symbol, exchange, currentprice):
+        v = currentprice
+        if (exchange == "IDEAL" or exchange == "IDEALPRO") and symbol == "USD":
+           v = 1/currentprice
+        if self.debug:
+           print "get_trade_price(symbol = %s, local_symbol = %s, exchange = %s, currentprice = %f) = %f" % (symbol, local_symbol, exchange, currentprice, v)
+        return v
+    def check_place_order_error(self, errorCode, errorMessage):
+        if self.debug:
+           print "check_place_order_error(errorCode = %d, errorMessage = %s)" % (errorCode, errorMessage)
+        if self.ERROR_ODD_LOT in errorMessage:
+           if self.debug:
+              print "check_place_order_error(errorCode = %d, errorMessage = %s) ODD LOT FOUND" % (errorCode, errorMessage)
+           return False
+        d1 = errorCode >= self.ERRORS_IB_300_START and errorCode <= self.ERRORS_IB_399_END
+        d2 = errorCode in self.ERRORS_TO_TRIGGER_ORDRPLACED
+        if d1 or d2:
+           if self.debug:
+              print "check_place_order_error - return TRUE"
+           return True
+        else:
+           if self.debug:
+              print "check_place_order_error - return FALSE"
+           return False
 
     @staticmethod
     def add_all_arguments():
@@ -1183,7 +1236,7 @@ class IBTrader():
         parser.add_argument('-sym', '--symbol', default='not_a_symbol', help="Symbol")
         parser.add_argument('-ot', '--order_secType', default='not_a_secType', help="Security Type [CASH|STK|FUT|OPT|etc]")
         parser.add_argument('-oe', '--order_exchange', default='not_a_exchange', help="Exchange [IDEALPRO|SMART]")
-        parser.add_argument('-ope', '--order_primaryexchange', default='not_a_primaryexchange', help="Primary Exchange [IDEALPRO|SMART]")
+        parser.add_argument('-ope', '--order_primary_exchange', default='not_a_primary_exchange', help="Primary Exchange [IDEALPRO|SMART]")
         parser.add_argument('-oc', '--order_currency', default='not_a_currency', help="Currency USD")
         parser.add_argument('-oa', '--order_action', default='not_a_action', help="Order action BUY|SELL")
         parser.add_argument('-ol', '--order_limit_price', default='not_a_limit_price', help="Limit Price for the order, ignored in case of market order")
@@ -1233,7 +1286,7 @@ class IBTrader():
             print "trade_options ", args.trade_options
             print "order_secType ", args.order_secType
             print "order_exchange ", args.order_exchange
-            print "order_primaryexchange ", args.order_primaryexchange
+            print "order_primary_exchange ", args.order_primary_exchange
             print "order_currency ", args.order_currency
             print "order_action ", args.order_action
             print "order_limit_price ", args.order_limit_price
@@ -1289,6 +1342,8 @@ class IBTrader():
                 args.order_secType = "STK"
                 if args.order_exchange == 'not_a_exchange':
                         args.order_exchange = "SMART"
+                if args.order_primary_exchange == 'not_a_primary_exchange':
+                        args.order_primary_exchange = "SMART"
                 args.order_currency = "USD"
 
         if args.trade_forex:
@@ -1308,7 +1363,7 @@ class IBTrader():
            if args.symbol == 'not_a_symbol':
                   print "No symbol passed for quote"
                   return
-           ibcontract = self.get_contract(args.symbol, args.order_secType, args.order_exchange, args.order_exchange, args.order_currency)
+           ibcontract = self.get_contract(args.symbol, args.order_secType, args.order_exchange, args.order_primary_exchange, args.order_currency)
            if args.order_exchange == 'IDEALPRO' or args.order_exchange == 'IDEAL':
               ibcontract.localSymbol = args.symbol + "." + args.order_currency
            else:
@@ -1367,7 +1422,7 @@ class IBTrader():
                 order_symbol = args.symbol
                 order_secType = args.order_secType
                 order_exchange = args.order_exchange
-                order_primaryexchange = args.order_primaryexchange
+                order_primary_exchange = args.order_primary_exchange
                 order_currency = args.order_currency
                 order_action = args.order_action
                 order_limit_price = args.order_limit_price
@@ -1409,10 +1464,10 @@ class IBTrader():
                 else:
                    order_limit_price = float(args.order_limit_price)
 
-                if order_primaryexchange == 'not_a_primaryexchange':
-                   order_primaryexchange = order_exchange
+                if order_primary_exchange == 'not_a_primary_exchange':
+                   order_primary_exchange = order_exchange
 
-                mystr = self.place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number, args.no_wait_for_complete, args.order_id)
+                mystr = self.place_order(order_symbol, order_secType, order_exchange, order_primary_exchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number, args.no_wait_for_complete, args.order_id)
                 #print mystr
 
         if args.print_executions or args.print_sym_executions or args.print_order_id:
@@ -1449,6 +1504,8 @@ class IBTrader():
                         print self.get_base_currency_cash()
                         pass
 
+                if myport is None:
+                   return None
                 #portfolio_structure, exchange_rates, portfolio_holdings, total_cash_balance
                 port_struct = myport[0]
                 exch_rates = myport[1]
@@ -1481,32 +1538,39 @@ class IBTrader():
 
         if args.close_all_positions or args.close_sym_position:
                 myport = self.get_IB_positions()
+                if myport is None:
+                   return None
                 all_positions = myport[2]
                 args.no_wait_for_complete = 1
                 for key in  all_positions:
-                        order_localSymbol = key["localSymbol"]
-                        order_quantity = key["quantity"]
-                        if order_quantity < 0:
-                                order_quantity = -order_quantity
-                        if order_quantity > 0 and (args.close_all_positions or (args.close_sym_position and args.symbol == order_localSymbol)):
-                                if debug:
-                                        print "Portfolio %s ", key
-                                order_symbol = key["symbol"]
-                                order_secType = key["secType"]
-                                order_exchange = key["exchange"]
-                                order_currency = key["currency"]
-                                order_action = key["flip_action"]
-                                order_type = "MKT"
-                                if debug:
-                                   print "Close order_symbol = %s %s %s %d @ %s order_exchange = %s" % (order_symbol, key, order_action, order_quantity, order_type, order_exchange)
-                                order_limit_price = 0
-                                if order_exchange == '':
-                                   order_exchange = self.get_order_exchange(order_symbol, order_secType, order_currency)
-                                order_primaryexchange = order_exchange
-                                self.place_order(order_symbol, order_secType, order_exchange, order_primaryexchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number, True, 0)
+                    order_localSymbol = key["localSymbol"]
+                    order_quantity = key["quantity"]
+                    if order_quantity < 0:
+                            order_quantity = -order_quantity
+                    if order_quantity > 0 and (args.close_all_positions or (args.close_sym_position and args.symbol == order_localSymbol)):
+                        if debug:
+                                print "Portfolio %s " % key
+                        order_symbol = key["symbol"]
+                        order_secType = key["secType"]
+                        order_exchange = key["exchange"]
+                        order_primary_exchange = key["primaryExchange"]
+                        order_currency = key["currency"]
+                        order_action = key["flip_action"]
+                        order_type = "MKT"
+                        if debug:
+                           print "Close order_symbol = %s %s %s %d @ %s order_exchange = %s order_primary_exchange = %s" % (order_symbol, key, order_action, order_quantity, order_type, order_exchange, order_primary_exchange)
+                        order_limit_price = 0
+                        if order_exchange == '':
+                           order_exchange = self.get_order_exchange(order_symbol, order_secType, order_currency)
+                        if order_primary_exchange == '':
+                           order_primary_exchange = order_exchange
+                        self.place_order(order_symbol, order_secType, order_exchange, order_primary_exchange, order_currency, order_action, order_limit_price, order_type, order_quantity, args.account_number, True, 0)
+
         #24 {'orderid': 24L, 'exchange': 'IDEALPRO', 'secType': 'CASH', 'orderType': 'LMT', 'primaryExchange': '', 'clientid': 8899L, 'qty': 100000, 'currency': 'USD', 'contract': <swigibpy.Contract; proxy of <Swig Object of type 'Contract *' at 0x7fb0883a2480> >, 'action': 'BUY', 'expiry': '', 'symbol': 'EUR', 'quantity': 100000L, 'side': 'BUY'}
         if args.print_open_orders or args.cancel_all_orders or args.cancel_sym_order or args.print_open_sym_orders:
                 openorders = self.get_open_orders()
+                if openorders is None:
+                   return None
                 mystr = ""
                 if debug:
                         print "Active orders: (should just be limit order)"
@@ -1525,7 +1589,7 @@ class IBTrader():
                         
                         if args.cancel_all_orders or (args.cancel_sym_order and args.symbol == localSymbol):
                                 if debug:
-                                        print "Cancel order id %d symbol = %s" %  (key, sym)
+                                        print "Cancel order id %s symbol = %s" %  (key, localSymbol)
                                 self.cancel_order(orderid)
 
                 if args.cancel_all_orders:
